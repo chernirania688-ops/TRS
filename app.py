@@ -281,14 +281,41 @@ if page=="global":
 def dept_page(dept_name):
     color=DEPT_COLORS[dept_name]
     icons={"Découpe":"🪚","Usinage":"⚙️","Peinture":"🎨"}
-    st.markdown(f"<h2 style='font-family:Rajdhani;font-size:2rem;color:#e6edf3;letter-spacing:2px'>{icons[dept_name]} DÉPARTEMENT {dept_name.upper()}</h2>",unsafe_allow_html=True)
-    st.markdown("<p style='color:#8b949e;font-size:0.78rem'>10 tranches × 25 jours — filtrage interactif — seuils TPM</p>",unsafe_allow_html=True)
+    st.markdown(f"<h2 style=\'font-family:Rajdhani;font-size:2rem;color:#e6edf3;letter-spacing:2px\'>{icons[dept_name]} DÉPARTEMENT {dept_name.upper()}</h2>",unsafe_allow_html=True)
+    st.markdown("<p style=\'color:#8b949e;font-size:0.78rem\'>10 tranches × 25 jours — filtrage interactif — seuils TPM</p>",unsafe_allow_html=True)
 
-    fc1,fc2=st.columns([2,1])
-    with fc1: sel_t=st.multiselect("Tranches",ALL_P,default=ALL_P,key=f"t_{dept_name}",
-                                    format_func=lambda x:f"Tranche {x}  (J{(x-1)*25+1}–J{x*25})")
-    with fc2: sel_prod=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key=f"p_{dept_name}")
-    if not sel_t: st.warning("Sélectionnez au moins une tranche."); return
+    # ── Filtre amélioré : boutons T1…T10 ──────────────────────────────────────
+    st.markdown("<p style=\'color:#8b949e;font-size:0.74rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px\'>Sélection des Tranches</p>",unsafe_allow_html=True)
+    btn_cols=st.columns(10)
+    key_prefix=f"btn_{dept_name}"
+    for i in range(1,11):
+        k=f"{key_prefix}_{i}"
+        if k not in st.session_state: st.session_state[k]=True
+    sel_row=st.columns([1,1,8])
+    with sel_row[0]:
+        if st.button("✅ Tout",key=f"all_{dept_name}",use_container_width=True):
+            for i in range(1,11): st.session_state[f"{key_prefix}_{i}"]=True; st.rerun()
+    with sel_row[1]:
+        if st.button("❌ Aucun",key=f"none_{dept_name}",use_container_width=True):
+            for i in range(1,11): st.session_state[f"{key_prefix}_{i}"]=False; st.rerun()
+
+    # Render T1–T10 toggle buttons
+    btn_cols2=st.columns(10)
+    for i,col in enumerate(btn_cols2,1):
+        with col:
+            active=st.session_state[f"{key_prefix}_{i}"]
+            label=f"T{i}"
+            if st.button(label,key=f"tog_{dept_name}_{i}",use_container_width=True,
+                         type="primary" if active else "secondary"):
+                st.session_state[f"{key_prefix}_{i}"]=not active; st.rerun()
+
+    sel_t=[i for i in range(1,11) if st.session_state[f"{key_prefix}_{i}"]]
+
+    # Produit filter
+    sel_prod=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key=f"p_{dept_name}")
+
+    if not sel_t:
+        st.warning("Sélectionnez au moins une tranche."); return
 
     df=dfs[dept_name][dfs[dept_name]["Tranche"].isin(sel_t)].copy()
     if sel_prod!="Tous": df=df[df["Produit"]==sel_prod]
@@ -312,8 +339,8 @@ def dept_page(dept_name):
     with cg3: st.plotly_chart(gauge(tq_m,"TQ","#3fb950",98),use_container_width=True,key=f"g3_{dept_name}")
     with cg4: st.plotly_chart(gauge(tp_m,"TP","#d29922",95),use_container_width=True,key=f"g4_{dept_name}")
 
-    # Courbe TRS/TD/TQ/TP par tranche
-    st.markdown("<div class='section-header'>Évolution TRS · TD · TQ · TP par Tranche (seuils TPM)</div>",unsafe_allow_html=True)
+    # ── Courbe TRS·TD·TQ·TP par tranche ──────────────────────────────────────
+    st.markdown("<div class=\'section-header\'>Évolution TRS · TD · TQ · TP par Tranche (seuils TPM)</div>",unsafe_allow_html=True)
     by_t=df.groupby("Tranche")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Tranche")
     fig_t=go.Figure()
     for kpi,c in KPI_COLORS.items():
@@ -323,23 +350,26 @@ def dept_page(dept_name):
     fig_t.update_layout(height=320,**BASE_LAYOUT,xaxis=tranche_xax(by_t["Tranche"]),yaxis=ax(pct=True))
     fig_t.update_yaxes(range=[0,110]); st.plotly_chart(fig_t,use_container_width=True)
 
-    # 4 courbes individuelles TRS / TD / TQ / TP
-    st.markdown("<div class='section-header'>Courbes individuelles par KPI avec seuil</div>",unsafe_allow_html=True)
+    # ── 4 courbes individuelles ────────────────────────────────────────────────
+    st.markdown("<div class=\'section-header\'>Courbes individuelles TRS · TD · TQ · TP avec seuil</div>",unsafe_allow_html=True)
+    fillcolors={"TRS":"rgba(88,166,255,0.07)","TD":"rgba(63,185,80,0.07)",
+                "TQ":"rgba(210,153,34,0.07)","TP":"rgba(163,113,247,0.07)"}
     cA,cB,cC,cD=st.columns(4)
     for col_,kpi,thresh in [(cA,"TRS",85),(cB,"TD",90),(cC,"TQ",98),(cD,"TP",95)]:
         with col_:
             fig_k=go.Figure()
             fig_k.add_trace(go.Scatter(x=by_t["Tranche"],y=by_t[kpi]*100,name=kpi,
-                line=dict(color=KPI_COLORS[kpi],width=2),mode="lines+markers",marker=dict(size=6),fill="tozeroy",
-                fillcolor=KPI_COLORS[kpi].replace("#","rgba(").replace("ff","255,"+"0.07)") if False else "rgba(88,166,255,0.06)"))
+                line=dict(color=KPI_COLORS[kpi],width=2),mode="lines+markers",
+                marker=dict(size=6),fill="tozeroy",fillcolor=fillcolors[kpi]))
             fig_k.add_hline(y=thresh,line_dash="dash",line_color=THRESH_COLORS[kpi],line_width=1.5,
                             annotation_text=f"Seuil {thresh}%",annotation_font=dict(color=THRESH_COLORS[kpi],size=8))
             fig_k.update_layout(height=210,**BASE_LAYOUT,xaxis=tranche_xax(by_t["Tranche"]),yaxis=ax(pct=True))
             fig_k.update_layout(title=dict(text=f"Évolution {kpi}",font=dict(color=TEXT,size=11)))
-            fig_k.update_yaxes(range=[0,110]); st.plotly_chart(fig_k,use_container_width=True,key=f"ind_{kpi}_{dept_name}")
+            fig_k.update_yaxes(range=[0,110])
+            st.plotly_chart(fig_k,use_container_width=True,key=f"ind_{kpi}_{dept_name}")
 
-    # Courbe journalière par tranche
-    st.markdown("<div class='section-header'>TRS journalier dans chaque Tranche (J1–J25)</div>",unsafe_allow_html=True)
+    # ── TRS journalier par tranche ─────────────────────────────────────────────
+    st.markdown("<div class=\'section-header\'>TRS journalier dans chaque Tranche (J1–J25)</div>",unsafe_allow_html=True)
     palette=["#58a6ff","#3fb950","#d29922","#a371f7","#f85149","#f0883e","#39d353","#79c0ff","#e3b341","#c77dff"]
     fig_j=go.Figure()
     for i,t in enumerate(sorted(sel_t)):
@@ -354,31 +384,117 @@ def dept_page(dept_name):
                         xaxis=ax(title="Jour dans la tranche (1–25)",dtick=1),yaxis=ax(pct=True))
     fig_j.update_yaxes(range=[0,110]); st.plotly_chart(fig_j,use_container_width=True)
 
-    # TRS par produit + quantité
-    cl,cr=st.columns(2)
-    with cl:
-        st.markdown("<div class='section-header'>TRS Moyen par Produit</div>",unsafe_allow_html=True)
-        by_p=df.groupby("Produit")["TRS"].mean().reset_index().sort_values("Produit")
-        fig_bp=go.Figure(go.Bar(x=by_p["Produit"],y=by_p["TRS"]*100,marker_color=color,
-            marker_line_color="rgba(0,0,0,0)",text=(by_p["TRS"]*100).round(1).astype(str)+"%",
-            textposition="outside",textfont=dict(color=TEXT,size=10)))
-        fig_bp.add_hline(y=85,line_dash="dash",line_color="#f85149",line_width=1.5,
-                         annotation_text="Seuil 85%",annotation_font=dict(color="#f85149",size=9))
-        fig_bp.update_layout(height=250,**BASE_LAYOUT,xaxis=ax(),yaxis=ax(pct=True))
-        fig_bp.update_yaxes(range=[0,110]); st.plotly_chart(fig_bp,use_container_width=True)
-    with cr:
-        st.markdown("<div class='section-header'>Quantité par Produit × Tranche</div>",unsafe_allow_html=True)
-        by_qt=df.groupby(["Tranche","Produit"])["Quantité"].sum().reset_index().sort_values("Tranche")
-        fig_qt=go.Figure()
-        for p,pc_ in [("P1","#58a6ff"),("P2","#3fb950"),("P3","#d29922"),("P4","#a371f7")]:
-            sub=by_qt[by_qt["Produit"]==p]
-            if sub.empty: continue
-            fig_qt.add_trace(go.Bar(name=p,x=[f"T{int(v)}" for v in sub["Tranche"]],y=sub["Quantité"],marker_color=pc_))
-        fig_qt.update_layout(barmode="stack",height=250,**BASE_LAYOUT,xaxis=ax(),yaxis=ax())
-        st.plotly_chart(fig_qt,use_container_width=True)
+    # ── Analyse par Produit : TRS TD TQ TP ────────────────────────────────────
+    st.markdown("<div class=\'section-header\'>Analyse par Produit — TRS · TD · TQ · TP (quel produit est le plus problématique ?)</div>",unsafe_allow_html=True)
+    by_p_full=dfs[dept_name][dfs[dept_name]["Tranche"].isin(sel_t)].groupby("Produit")[["TRS","TD","TQ","TP","Quantité",
+              "Panne","Arrêts_mineurs","Rejet_qualité","Rejet_Démarrage"]].agg(
+              {"TRS":"mean","TD":"mean","TQ":"mean","TP":"mean","Quantité":"sum",
+               "Panne":"sum","Arrêts_mineurs":"sum","Rejet_qualité":"sum","Rejet_Démarrage":"sum"}).reset_index()
 
-    # Tableau simple
-    st.markdown("<div class='section-header'>📋 Tableau Récapitulatif par Tranche</div>",unsafe_allow_html=True)
+    prod_cols=["P1","P2","P3","P4"]
+    pc_colors={"P1":"#58a6ff","P2":"#3fb950","P3":"#d29922","P4":"#a371f7"}
+
+    # Grouped bar: TRS TD TQ TP par produit
+    fig_pg=go.Figure()
+    for kpi,c in KPI_COLORS.items():
+        vals=[]
+        for p in prod_cols:
+            row=by_p_full[by_p_full["Produit"]==p]
+            vals.append(float(row[kpi].values[0])*100 if len(row)>0 else 0)
+        fig_pg.add_trace(go.Bar(name=kpi,x=prod_cols,y=vals,marker_color=c,
+            text=[f"{v:.1f}%" for v in vals],textposition="outside",
+            textfont=dict(color=TEXT,size=9)))
+    for kpi in ["TRS","TD","TQ","TP"]:
+        fig_pg.add_hline(y=THRESHOLDS[kpi],line_dash="dash",line_color=THRESH_COLORS[kpi],line_width=1,
+                         annotation_text=f"Seuil {kpi} {THRESHOLDS[kpi]}%",
+                         annotation_font=dict(color=THRESH_COLORS[kpi],size=8))
+    fig_pg.update_layout(barmode="group",height=320,**BASE_LAYOUT,
+                         xaxis=ax(title="Produit"),yaxis=ax(pct=True))
+    fig_pg.update_layout(title=dict(text="KPIs TRS · TD · TQ · TP par Produit",font=dict(color=TEXT,size=12)))
+    fig_pg.update_yaxes(range=[0,115])
+    st.plotly_chart(fig_pg,use_container_width=True)
+
+    # ── Radar produit ──────────────────────────────────────────────────────────
+    cl_r,cr_r=st.columns(2)
+    with cl_r:
+        st.markdown("<div class=\'section-header\'>Radar — Profil qualité par Produit</div>",unsafe_allow_html=True)
+        categories=["TRS","TD","TQ","TP"]
+        fig_rad=go.Figure()
+        for p in prod_cols:
+            row=by_p_full[by_p_full["Produit"]==p]
+            if row.empty: continue
+            vals=[float(row[k].values[0])*100 for k in categories]+[float(row["TRS"].values[0])*100]
+            fig_rad.add_trace(go.Scatterpolar(r=vals,theta=categories+[categories[0]],
+                name=p,line=dict(color=pc_colors[p],width=2),fill="toself",
+                fillcolor=pc_colors[p].replace("#","rgba(").replace("ff","255,0.06)")))
+        # Add threshold circles
+        for kpi,thresh in THRESHOLDS.items():
+            pass  # plotly polar threshold lines are complex, skip
+        fig_rad.update_layout(height=300,**BASE_LAYOUT,
+            polar=dict(bgcolor="#161b22",
+                radialaxis=dict(visible=True,range=[0,100],tickfont=dict(color=MUTED,size=8),
+                                gridcolor="#21262d",ticksuffix="%"),
+                angularaxis=dict(tickfont=dict(color=TEXT,size=11),gridcolor="#21262d")))
+        st.plotly_chart(fig_rad,use_container_width=True)
+
+    with cr_r:
+        # ── Diagnostic produit le plus problématique ──
+        st.markdown("<div class=\'section-header\'>🏆 Diagnostic — Produit le plus problématique</div>",unsafe_allow_html=True)
+        scores=[]
+        for p in prod_cols:
+            row=by_p_full[by_p_full["Produit"]==p]
+            if row.empty: continue
+            trs_p=float(row["TRS"].values[0])*100
+            td_p=float(row["TD"].values[0])*100
+            tq_p=float(row["TQ"].values[0])*100
+            tp_p=float(row["TP"].values[0])*100
+            # Score = sum of gaps below threshold (higher = more problematic)
+            gap=max(0,85-trs_p)+max(0,90-td_p)+max(0,98-tq_p)+max(0,95-tp_p)
+            pannes=float(row["Panne"].values[0])
+            rejets=float(row["Rejet_qualité"].values[0])+float(row["Rejet_Démarrage"].fillna(0).values[0])
+            scores.append({"Produit":p,"TRS %":round(trs_p,1),"TD %":round(td_p,1),
+                           "TQ %":round(tq_p,1),"TP %":round(tp_p,1),
+                           "Écart seuils":round(gap,1),"Pannes (min)":int(pannes),"Rejets (pcs)":int(rejets)})
+        scores_df=pd.DataFrame(scores).sort_values("Écart seuils",ascending=False)
+        if not scores_df.empty:
+            worst=scores_df.iloc[0]
+            best=scores_df.iloc[-1]
+            st.markdown(f"""<div style=\'background:#2d1515;border:1px solid #f85149;border-radius:8px;padding:12px 16px;margin-bottom:10px\'>
+<p style=\'color:#f85149;font-weight:700;margin:0 0 4px;font-family:Rajdhani;font-size:1.1rem\'>⚠️ Produit le plus problématique : {worst["Produit"]}</p>
+<p style=\'color:#c9d1d9;font-size:0.8rem;margin:0\'>TRS={worst["TRS %"]}% · TD={worst["TD %"]}% · TQ={worst["TQ %"]}% · TP={worst["TP %"]}%</p>
+<p style=\'color:#8b949e;font-size:0.78rem;margin:4px 0 0\'>Écart total aux seuils TPM : <span style=\'color:#f85149;font-weight:600\'>{worst["Écart seuils"]}%</span> · Pannes : {worst["Pannes (min)"]} min · Rejets : {worst["Rejets (pcs)"]} pcs</p>
+</div>""",unsafe_allow_html=True)
+            st.markdown(f"""<div style=\'background:#0d1f0d;border:1px solid #3fb950;border-radius:8px;padding:12px 16px;margin-bottom:10px\'>
+<p style=\'color:#3fb950;font-weight:700;margin:0 0 4px;font-family:Rajdhani;font-size:1.1rem\'>✅ Meilleur produit : {best["Produit"]}</p>
+<p style=\'color:#c9d1d9;font-size:0.8rem;margin:0\'>TRS={best["TRS %"]}% · TD={best["TD %"]}% · TQ={best["TQ %"]}% · TP={best["TP %"]}%</p>
+</div>""",unsafe_allow_html=True)
+        st.dataframe(scores_df,use_container_width=True,hide_index=True,
+                     column_config={
+                         "TRS %":st.column_config.ProgressColumn("TRS %",min_value=0,max_value=100,format="%.1f%%"),
+                         "TD %": st.column_config.ProgressColumn("TD %", min_value=0,max_value=100,format="%.1f%%"),
+                         "TQ %": st.column_config.ProgressColumn("TQ %", min_value=0,max_value=100,format="%.1f%%"),
+                         "TP %": st.column_config.ProgressColumn("TP %", min_value=0,max_value=100,format="%.1f%%"),
+                     })
+
+    # ── Pertes par Produit ─────────────────────────────────────────────────────
+    st.markdown("<div class=\'section-header\'>Pertes par Produit — Pannes · Arrêts · Rejets</div>",unsafe_allow_html=True)
+    fig_pp=go.Figure()
+    perte_types=[("Panne","Pannes (min)","#f85149"),("Arrêts_mineurs","Arrêts mineurs (min)","#d29922"),
+                  ("Rejet_qualité","Rejet qualité (pcs)","#3fb950"),("Rejet_Démarrage","Rejet démarrage (pcs)","#a371f7")]
+    for col_name,label,c in perte_types:
+        vals=[]
+        for p in prod_cols:
+            row=by_p_full[by_p_full["Produit"]==p]
+            vals.append(float(row[col_name].fillna(0).values[0]) if len(row)>0 else 0)
+        fig_pp.add_trace(go.Bar(name=label,x=prod_cols,y=vals,marker_color=c,
+            text=[f"{int(v)}" for v in vals],textposition="outside",textfont=dict(color=TEXT,size=9)))
+    fig_pp.update_layout(barmode="group",height=280,**BASE_LAYOUT,
+                         xaxis=ax(title="Produit"),yaxis=ax(title="Cumul (min / pcs)"))
+    fig_pp.update_layout(title=dict(text="Pertes cumulées par Produit (tranches sélectionnées)",font=dict(color=TEXT,size=12)))
+    st.plotly_chart(fig_pp,use_container_width=True)
+
+    # ── Tableau récap ──────────────────────────────────────────────────────────
+    st.markdown("<div class=\'section-header\'>📋 Tableau Récapitulatif par Tranche</div>",unsafe_allow_html=True)
     recap2=[]
     for t in sorted(df["Tranche"].unique()):
         sub=df[df["Tranche"]==t]
