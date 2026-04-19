@@ -537,7 +537,7 @@ elif page=="peinture":dept_page("Peinture")
 # ═══════════════════════════════════════════════════════════════════════════════
 elif page=="pertes":
     page_header("🔍","SOURCE DES PERTES","Analyse causale — 3 familles · 11 sources · démarche TPM")
-
+ 
     with st.expander("📖 Fondement méthodologique — Démarche TPM",expanded=False):
         st.markdown("""<div style='color:#c9d1d9;font-size:0.82rem;line-height:1.9'>
 <p>La démarche <strong>TPM (Total Productive Maintenance)</strong> décompose l'inefficacité selon :</p>
@@ -548,18 +548,18 @@ elif page=="pertes":
 <p><span style='color:#d29922'>🟡</span> <strong>Pertes PERFORMANCE (TP)</strong> — Arrêts mineurs · Nettoyage · Réglage dérive · Inspection · Changement outil · Déplacement · Lubrification</p>
 <p><span style='color:#3fb950'>🟢</span> <strong>Pertes QUALITÉ (TQ)</strong> — Rejet démarrage · Rejet qualité</p>
 </div>""",unsafe_allow_html=True)
-
+ 
     sel_t_p=tranche_toggle("p")
     fc1,fc2=st.columns(2)
     with fc1: sel_dept_p=st.selectbox("Département",["Tous"]+list(DEPT_COLORS.keys()),key="d_pertes")
     with fc2: sel_prod_p=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key="p_pertes")
-
+ 
     combined=pd.concat(dfs.values(),ignore_index=True)
     df_p=combined[combined["Tranche"].isin(sel_t_p)].copy()
     if sel_dept_p!="Tous": df_p=df_p[df_p["Département"]==sel_dept_p]
     if sel_prod_p!="Tous": df_p=df_p[df_p["Produit"]==sel_prod_p]
     if df_p.empty: st.warning("Aucune donnée."); st.stop()
-
+ 
     pdef={"Pannes":("Panne","TD","#f85149"),"Remplacement préventif":("Remplacement_préventif","TD","#c9362e"),
           "Arrêts mineurs":("Arrêts_mineurs","TP","#d29922"),"Nettoyage":("Nettoyage","TP","#e3b341"),
           "Réglage dérive":("Réglage_dérive","TP","#f0c040"),"Inspection":("Inspection","TP","#ffd166"),
@@ -567,7 +567,7 @@ elif page=="pertes":
           "Lubrification":("Lubrification","TP","#c77dff"),
           "Rejet démarrage":("Rejet_Démarrage","TQ","#3fb950"),"Rejet qualité":("Rejet_qualité","TQ","#56d364")}
     pv={l:df_p[c].fillna(0).sum() for l,(c,_,_) in pdef.items()}
-
+ 
     st.markdown("<br>",unsafe_allow_html=True)
     pk1,pk2,pk3=st.columns(3)
     td_l=pv["Pannes"]+pv["Remplacement préventif"]
@@ -577,8 +577,8 @@ elif page=="pertes":
     with pk2: st.markdown(kpi_card("PERTES TP",f"{tp_l:,.0f} min","orange","7 sources"),unsafe_allow_html=True)
     with pk3: st.markdown(kpi_card("PERTES TQ",f"{tq_l:,.0f} pcs","teal","Rejets démarrage + qualité"),unsafe_allow_html=True)
     st.markdown("<br>",unsafe_allow_html=True)
-
-    cl2,cr2=st.columns(2)
+ 
+     cl2,cr2=st.columns(2)
     with cl2:
         st.markdown("<div class='sh'>Diagramme de Pareto des Pertes</div>",unsafe_allow_html=True)
         st.markdown("""<div class='infobox'><strong style='color:#f0883e'>À quoi sert le Pareto ?</strong>
@@ -597,7 +597,7 @@ Les sources sont triées de la plus impactante à gauche. La <strong>courbe oran
         fig_par.update_layout(height=310,**BL,xaxis=ax(angle=30),yaxis=ax(),
                               yaxis2=dict(ticksuffix="%",tickfont=dict(color=MUTED,size=10),gridcolor="#1e2430"))
         st.plotly_chart(fig_par,use_container_width=True)
-
+ 
     with cr2:
         st.markdown("<div class='sh'>Répartition — Anneau TPM (6 Grandes Pertes)</div>",unsafe_allow_html=True)
         # 6 grandes pertes TPM avec pourcentages (comme image 2)
@@ -609,14 +609,14 @@ Les sources sont triées de la plus impactante à gauche. La <strong>courbe oran
         arrets_min=pv.get("Nettoyage",0)+pv.get("Réglage dérive",0)+pv.get("Changement outil",0)
         demarrages=pv.get("Rejet démarrage",0)
         nettoyage_reglage=pv.get("Lubrification",0)+pv.get("Déplacement",0)+pv.get("Inspection",0)
-
+ 
         donut_vals=[vitesse_reduite,pannes_machines,rejets_qual,arrets_min,demarrages,nettoyage_reglage]
         donut_labels=["Vitesse réduite (TP)","Pannes machines","Rejets qualité",
                       "Arrêts mineurs","Démarrages","Nettoyage/Réglage"]
         donut_colors=["#58a6ff","#f85149","#3fb950","#d29922","#a371f7","#39d353"]
         total_d=sum(donut_vals) if sum(donut_vals)>0 else 1
         pcts=[v/total_d*100 for v in donut_vals]
-
+ 
         fig_do=go.Figure(go.Pie(
             labels=[f"{l} {p:.0f}%" for l,p in zip(donut_labels,pcts)],
             values=donut_vals,hole=0.52,
