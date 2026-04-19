@@ -337,20 +337,25 @@ def dept_page(dept_name):
             fig_k.update_yaxes(range=[0,110])
             st.plotly_chart(fig_k,use_container_width=True,key=f"ind_{kpi}_{dept_name}")
 
-    # TRS journalier par tranche
-    st.markdown("<div class='sh'>TRS journalier J1–J25 par Tranche</div>",unsafe_allow_html=True)
-    palette=["#58a6ff","#3fb950","#d29922","#a371f7","#f85149","#f0883e","#39d353","#79c0ff","#e3b341","#c77dff"]
+    # TRS·TD·TQ·TP par tranche — grouped bar
+    st.markdown("<div class='sh'>TRS · TD · TQ · TP par Tranche — Vue bâtonnets</div>",unsafe_allow_html=True)
+    by_t_bar=df.groupby("Tranche")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Tranche")
+    t_labels=[f"T{int(t)}" for t in by_t_bar["Tranche"]]
     fig_j=go.Figure()
-    for i,t in enumerate(sorted(sel_t)):
-        sub=df[df["Tranche"]==t].sort_values("Jour_P")
-        if sub.empty: continue
-        sp=sub.groupby("Jour_P")["TRS"].mean().reset_index()
-        fig_j.add_trace(go.Scatter(x=sp["Jour_P"],y=sp["TRS"]*100,name=f"T{t}",
-            line=dict(color=palette[i%10],width=1.8),mode="lines+markers",marker=dict(size=4)))
-    fig_j.add_hline(y=85,line_dash="dash",line_color="#f85149",line_width=1.5,
-                    annotation_text="Seuil 85%",annotation_font=dict(color="#f85149",size=9))
-    fig_j.update_layout(height=260,**BL,xaxis=ax(title="Jour (1–25)",dtick=1),yaxis=ax(pct=True))
-    fig_j.update_yaxes(range=[0,110]); st.plotly_chart(fig_j,use_container_width=True)
+    for kpi,c in KPI_COLORS.items():
+        yvals=by_t_bar[kpi]*100
+        fig_j.add_trace(go.Bar(name=kpi,x=t_labels,y=yvals,marker_color=c,
+            marker_line_color="rgba(0,0,0,0)",
+            text=[f"{v:.1f}%" for v in yvals],textposition="outside",
+            textfont=dict(color=TEXT,size=8)))
+    for kpi in ["TRS","TD","TQ","TP"]:
+        fig_j.add_hline(y=THRESHOLDS[kpi],line_dash="dash",line_color=THRESH_COLORS[kpi],line_width=1.2,
+                        annotation_text=f"Seuil {kpi} {THRESHOLDS[kpi]}%",
+                        annotation_position="top right",
+                        annotation_font=dict(color=THRESH_COLORS[kpi],size=8))
+    fig_j.update_layout(barmode="group",height=310,**BL,
+                        xaxis=ax(title="Tranche"),yaxis=ax(pct=True))
+    fig_j.update_yaxes(range=[0,115]); st.plotly_chart(fig_j,use_container_width=True)
 
     # ── Analyse par Produit ──────────────────────────────────────────────────
     st.markdown("<div class='sh'>Analyse par Produit — KPIs & Pertes</div>",unsafe_allow_html=True)
@@ -507,7 +512,13 @@ elif page=="pertes":
 
     cl2,cr2=st.columns(2)
     with cl2:
-        st.markdown("<div class='sh'>Pareto des Pertes (Règle 80/20)</div>",unsafe_allow_html=True)
+        st.markdown("<div class='sh'>Diagramme de Pareto des Pertes</div>",unsafe_allow_html=True)
+        st.markdown("""<div style='background:#1c2128;border-left:3px solid #f0883e;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:0.78rem;color:#c9d1d9;line-height:1.7'>
+<strong style='color:#f0883e'>À quoi sert le Pareto ?</strong><br>
+Le diagramme de Pareto applique la <strong>règle 80/20</strong> (loi de Pareto) : en production, <strong>80% des pertes sont causées par seulement 20% des sources</strong>.
+Les sources sont triées de la plus impactante à la moins impactante (barres de gauche à droite), et la courbe orange montre le cumul en %.
+<strong>La zone à gauche de la ligne 80%</strong> regroupe les causes prioritaires à traiter en premier — c'est sur elles que les actions TPM doivent se concentrer pour un maximum d'efficacité.
+</div>""",unsafe_allow_html=True)
         sp=dict(sorted(pv.items(),key=lambda x:x[1],reverse=True))
         labels=list(sp.keys()); vals=list(sp.values())
         cumul=np.cumsum(vals)/max(sum(vals),1)*100
