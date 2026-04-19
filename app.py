@@ -721,90 +721,39 @@ elif page=="final":
     st.plotly_chart(fig_rm,use_container_width=True)
 
     # ═══ 2. GAINS OBTENUS ═══════════════════════════════════════════════════
-st.markdown("---")
-st.markdown("<h3 style='font-family:Rajdhani;font-size:1.5rem;color:#3fb950;letter-spacing:1px;margin-bottom:16px'>📊 Gains obtenus après application du plan d'action — par Département</h3>", unsafe_allow_html=True)
-
-# ====================== DONNÉES AVANT / APRÈS ======================
-# Tu peux modifier ces valeurs selon tes calculs
-DEPT_COLORS = {
-    "Découpe": "#00ff88",
-    "Usinage": "#00ccff",
-    "Peinture": "#ff8800"
-}
-
-# Valeurs actuelles (avant amélioration)
-actuals = {
-    "Découpe":  {"TD": 63.0, "TP": 64.0, "TQ": 98.0, "TRS": 63.0},
-    "Usinage":  {"TD": 64.0, "TP": 65.0, "TQ": 97.0, "TRS": 64.0},
-    "Peinture": {"TD": 52.0, "TP": 68.0, "TQ": 96.0, "TRS": 52.0}
-}
-
-# Valeurs cibles (après amélioration)
-TARGETS = {
-    "Découpe":  {"TD": 78.0, "TP": 77.0, "TQ": 99.0, "TRS": 78.0},
-    "Usinage":  {"TD": 77.0, "TP": 78.0, "TQ": 98.0, "TRS": 77.0},
-    "Peinture": {"TD": 68.0, "TP": 80.0, "TQ": 98.0, "TRS": 68.0}
-}
-
-# Paramètres graphiques
-TEXT = "#ffffff"
-MUTED = "#8b949e"
-BL = {"plot_bgcolor": "#1a1f2e", "paper_bgcolor": "#1a1f2e"}
-
-import plotly.graph_objects as go
-
-for dept, dc in DEPT_COLORS.items():
-    act = actuals[dept]
-    tgt = TARGETS[dept]
-    kpis = ["TD", "TP", "TQ", "TRS"]
-    
-    ann_cols = st.columns(4)
-    
-    for i, kpi in enumerate(kpis):
-        a = act[kpi]
-        t = tgt[kpi]
-        delta = t - a
-        with ann_cols[i]:
-            st.markdown(f"""
-                <div style='text-align:center; padding:8px 0; background:#252b3a; border-radius:8px; margin:2px;'>
-                    <div style='color:#8b949e; font-size:0.85rem; font-weight:500;'>{a:.1f}%</div>
-                    <div style='color:{dc}; font-size:0.95rem; font-weight:700;'>↑ +{delta:.1f} pts</div>
-                    <div style='color:#3fb950; font-family:Rajdhani; font-size:1.3rem; font-weight:700;'>{t:.1f}%</div>
-                    <div style='color:#8b949e; font-size:0.72rem; text-transform:uppercase; letter-spacing:1px;'>{kpi}</div>
-                </div>
-            """, unsafe_allow_html=True)
-
-    # Graphique Avant / Après
-    fig_ab = go.Figure()
-    fig_ab.add_trace(go.Bar(
-        name="Actuel", x=kpis, y=[act[k] for k in kpis],
-        marker_color="#4a5568", text=[f"{act[k]:.1f}%" for k in kpis],
-        textposition="outside", textfont=dict(color=TEXT, size=10)
-    ))
-    fig_ab.add_trace(go.Bar(
-        name="Objectif", x=kpis, y=[tgt[k] for k in kpis],
-        marker_color=dc, text=[f"{tgt[k]:.1f}%" for k in kpis],
-        textposition="outside", textfont=dict(color=TEXT, size=10)
-    ))
-    fig_ab.add_trace(go.Scatter(
-        x=kpis, y=[act[k] for k in kpis], mode="lines",
-        line=dict(color="#f85149", width=1.5, dash="dash"),
-        showlegend=False
-    ))
-
-    fig_ab.update_layout(
-        barmode="group",
-        height=320,
-        plot_bgcolor="#1a1f2e",
-        paper_bgcolor="#1a1f2e",
-        title=dict(text=f"Gains obtenus après 10 mois — {dept}", font=dict(color=MUTED, size=14)),
-        xaxis=dict(showgrid=False, zeroline=False),
-        yaxis=dict(showgrid=True, gridcolor="#2d3748", zeroline=False, range=[0, 115]),
-        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=MUTED, size=11))
-    )
-
-    st.plotly_chart(fig_ab, use_container_width=True)
-    st.markdown("<hr style='border-color:#1e2430;margin:12px 0'>", unsafe_allow_html=True)
+ st.markdown("---")
+    st.markdown("<h3 style='font-family:Rajdhani;font-size:1.5rem;color:#3fb950;letter-spacing:1px;margin-bottom:16px'>📊 Gains obtenus après application du plan d'action — par Département</h3>",unsafe_allow_html=True)
+ 
+    for dept,dc in DEPT_COLORS.items():
+        act=actuals[dept]; tgt=TARGETS[dept]; kpis=["TD","TP","TQ","TRS"]
+        ann_cols=st.columns(4)
+        for kpi in kpis:
+            a=act[kpi]; t=tgt[kpi]; delta=t-a
+            with ann_cols[kpis.index(kpi)]:
+                st.markdown(f"""<div style='text-align:center;padding:6px 0'>
+<div style='color:#8b949e;font-size:0.85rem;font-weight:500'>{a:.1f}%</div>
+<div style='color:{dc};font-size:0.95rem;font-weight:700'>↑ +{delta:.1f} pts</div>
+<div style='color:#3fb950;font-family:Rajdhani;font-size:1.3rem;font-weight:700'>{t:.1f}%</div>
+<div style='color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px'>{kpi}</div>
+</div>""",unsafe_allow_html=True)
+        fig_ab=go.Figure()
+        fig_ab.add_trace(go.Bar(name="Actuel",x=kpis,y=[act[k] for k in kpis],
+            marker_color="#4a5568",marker_line_color="rgba(0,0,0,0)",
+            text=[f"{act[k]:.1f}%" for k in kpis],textposition="outside",textfont=dict(color=TEXT,size=10)))
+        fig_ab.add_trace(go.Bar(name="Objectif",x=kpis,y=[tgt[k] for k in kpis],
+            marker_color=dc,marker_line_color="rgba(0,0,0,0)",
+            text=[f"{tgt[k]:.1f}%" for k in kpis],textposition="outside",textfont=dict(color=TEXT,size=10)))
+        fig_ab.add_trace(go.Scatter(x=kpis,y=[act[k] for k in kpis],mode="lines",
+            line=dict(color="#f85149",width=1.5,dash="dash"),showlegend=False,
+            hoverinfo="skip"))
+        fig_ab.update_layout(barmode="group",height=300,**BL,
+            title=dict(text=f"Gains obtenus après 10 mois d'amélioration — {dept}",font=dict(color=MUTED,size=11)),
+            xaxis=ax(),yaxis=ax(pct=True))
+        fig_ab.update_layout(legend=dict(bgcolor="rgba(0,0,0,0)",font=dict(color=MUTED,size=11)))
+        fig_ab.update_yaxes(range=[0,115])
+        st.plotly_chart(fig_ab,use_container_width=True)
+        st.markdown("<hr style='border-color:#1e2430;margin:8px 0'>",unsafe_allow_html=True)
+ 
     # Production supplémentaire
     st.markdown("<div class='sh'>Production Supplémentaire Estimée</div>",unsafe_allow_html=True)
     ep1,ep2,ep3,ep4=st.columns(4)
@@ -822,7 +771,7 @@ for dept, dc in DEPT_COLORS.items():
 <div style='color:#3fb950;font-family:Rajdhani;font-size:2.2rem;font-weight:700'>+{ann:,}</div>
 <div style='color:#8b949e;font-size:0.72rem'>unités sur 250 jours</div>
 </div>""",unsafe_allow_html=True)
-
+ 
     st.markdown("<br>",unsafe_allow_html=True)
     st.markdown("""<div style='background:linear-gradient(135deg,#161b22,#1c2128);border:1px solid #1f6feb;border-radius:10px;padding:16px 20px'>
 <p style='color:#58a6ff;font-weight:700;margin:0 0 8px;font-family:Rajdhani;font-size:1.1rem'>💡 Synthèse — Gain TRS estimé si toutes les actions sont menées</p>
