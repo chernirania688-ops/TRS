@@ -578,7 +578,7 @@ elif page=="pertes":
     with pk3: st.markdown(kpi_card("PERTES TQ",f"{tq_l:,.0f} pcs","teal","Rejets démarrage + qualité"),unsafe_allow_html=True)
     st.markdown("<br>",unsafe_allow_html=True)
  
-     cl2,cr2=st.columns(2)
+    cl2,cr2=st.columns(2)
     with cl2:
         st.markdown("<div class='sh'>Diagramme de Pareto des Pertes</div>",unsafe_allow_html=True)
         st.markdown("""<div class='infobox'><strong style='color:#f0883e'>À quoi sert le Pareto ?</strong>
