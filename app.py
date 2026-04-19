@@ -206,12 +206,12 @@ def tranche_toggle(key_prefix):
 
 # ═══════════════════ SIDEBAR ═══════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("# 🏭 TRS")
+    st.markdown("# Entretien TRS")
     st.markdown("<p style='color:#484f58;font-size:0.68rem;letter-spacing:2px;margin-top:-4px'>MEUBLES INC.</p>",unsafe_allow_html=True)
     st.markdown("---")
-    PAGES={"📊  Dashboard Global":"global","🪚  Dép. Découpe":"decoupe",
-           "⚙️  Dép. Usinage":"usinage","🎨  Dép. Peinture":"peinture",
-           "🔍  Source des Pertes":"pertes","🏆  Dashboard Final":"final"}
+    PAGES={" Dashboard Global":"global","  Dép. Découpe":"decoupe",
+           " Dép. Usinage":"usinage"," Dép. Peinture":"peinture",
+           " Source des Pertes":"pertes","  Dashboard Final":"final"}
     if "page" not in st.session_state: st.session_state.page="global"
     for label,key in PAGES.items():
         is_active=st.session_state.page==key
@@ -281,16 +281,6 @@ if page=="global":
     fig_ev.update_layout(height=300,**BL,xaxis=txax(by_t["Tranche"]),yaxis=ax(pct=True))
     fig_ev.update_yaxes(range=[0,110]); st.plotly_chart(fig_ev,use_container_width=True)
 
-    # ── Comparaison 3 depts vs norme NFE (image 1) ──
-    st.markdown("<div class='sh'>Comparaison TRS — 3 Départements vs Norme NFE</div>",unsafe_allow_html=True)
-    dept_kpis={}
-    comb_all=pd.concat(dfs.values(),ignore_index=True)
-    comb_f=comb_all[comb_all["Tranche"].isin(sel_t)]
-    if sel_prod!="Tous": comb_f=comb_f[comb_f["Produit"]==sel_prod]
-    for dept in ["Découpe","Usinage","Peinture"]:
-        sub=comb_f[comb_f["Département"]==dept]
-        if sub.empty: dept_kpis[dept]={"TD":0,"TP":0,"TQ":0,"TRS":0}
-        else: dept_kpis[dept]={k:sub[k].mean()*100 for k in ["TD","TP","TQ","TRS"]}
 
     # 4 mini KPI cards per dept showing TRS
     mc1,mc2,mc3=st.columns(3)
@@ -581,10 +571,7 @@ elif page=="pertes":
     cl2,cr2=st.columns(2)
     with cl2:
         st.markdown("<div class='sh'>Diagramme de Pareto des Pertes</div>",unsafe_allow_html=True)
-        st.markdown("""<div class='infobox'><strong style='color:#f0883e'>À quoi sert le Pareto ?</strong>
-Il applique la <strong>règle 80/20</strong> : 80% des pertes proviennent de 20% des causes.
-Les sources sont triées de la plus impactante à gauche. La <strong>courbe orange</strong> montre le cumul en %.
-<strong>Concentrez les actions sur les barres à gauche de la ligne 80%</strong> — c'est là que l'effort est le plus rentable.</div>""",unsafe_allow_html=True)
+        st.markdown("""<div class='infobox'><strong style='color:#f0883e'>À quoi sert le Pareto ?</strong>)
         sp=dict(sorted(pv.items(),key=lambda x:x[1],reverse=True))
         labels=list(sp.keys()); vals=list(sp.values())
         cumul=np.cumsum(vals)/max(sum(vals),1)*100
