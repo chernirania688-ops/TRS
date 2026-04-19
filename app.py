@@ -721,9 +721,9 @@ elif page=="final":
     st.plotly_chart(fig_rm,use_container_width=True)
 
     # ═══ 2. GAINS OBTENUS ═══════════════════════════════════════════════════
-    st.markdown("---")
+ st.markdown("---")
     st.markdown("<h3 style='font-family:Rajdhani;font-size:1.5rem;color:#3fb950;letter-spacing:1px;margin-bottom:16px'>📊 Gains obtenus après application du plan d'action — par Département</h3>",unsafe_allow_html=True)
-
+ 
     for dept,dc in DEPT_COLORS.items():
         act=actuals[dept]; tgt=TARGETS[dept]; kpis=["TD","TP","TQ","TRS"]
         ann_cols=st.columns(4)
@@ -753,6 +753,7 @@ elif page=="final":
         fig_ab.update_yaxes(range=[0,115])
         st.plotly_chart(fig_ab,use_container_width=True)
         st.markdown("<hr style='border-color:#1e2430;margin:8px 0'>",unsafe_allow_html=True)
+           
 
     # Production supplémentaire
     st.markdown("<div class='sh'>Production Supplémentaire Estimée</div>",unsafe_allow_html=True)
