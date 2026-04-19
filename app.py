@@ -71,6 +71,14 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 .infobox{background:#161b22;border-left:3px solid #f0883e;border-radius:0 8px 8px 0;
     padding:10px 14px;margin-bottom:10px;font-size:0.78rem;color:#c9d1d9;line-height:1.7;}
 
+/* ── View toggle ── */
+.view-toggle{display:flex;gap:6px;margin-bottom:16px;}
+
+/* ── Pertes cards ── */
+.perte-card{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:14px 16px;margin-bottom:8px;}
+.perte-bar-bg{background:#1c2128;border-radius:4px;height:6px;margin-top:6px;}
+.perte-bar-fill{height:6px;border-radius:4px;}
+
 /* ── Misc ── */
 .tranche-label{font-size:0.62rem;color:#484f58;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;}
 div[data-testid="stHorizontalBlock"]{gap:8px;}
@@ -130,6 +138,8 @@ def load_data():
         df=df.dropna(subset=["Journée"]); df["Journée"]=df["Journée"].astype(int)
         df["Tranche"]=((df["Journée"]-1)//25+1).clip(1,10)
         df["Jour_P"]=((df["Journée"]-1)%25)+1
+        # Ajouter colonne Mois (approximatif : 21 jours ouvrés/mois)
+        df["Mois"]=((df["Journée"]-1)//21+1).clip(1,12)
         df["Département"]=s; dfs[s]=df.reset_index(drop=True)
     return dfs
 
@@ -181,6 +191,24 @@ def pbar_cfg():
             "TD %": st.column_config.ProgressColumn("TD %", min_value=0,max_value=100,format="%.2f%%"),
             "TQ %": st.column_config.ProgressColumn("TQ %", min_value=0,max_value=100,format="%.2f%%"),
             "TP %": st.column_config.ProgressColumn("TP %", min_value=0,max_value=100,format="%.2f%%")}
+
+# ═══════════════════ VIEW TOGGLE (Jours / Mois) ════════════════════════════════
+def view_toggle(key_prefix):
+    """Retourne 'jour' ou 'mois' selon le bouton actif."""
+    if f"{key_prefix}_view" not in st.session_state:
+        st.session_state[f"{key_prefix}_view"] = "jour"
+    bv1, bv2, _ = st.columns([1.2, 1.2, 9])
+    with bv1:
+        if st.button("📅 Jours", key=f"{key_prefix}_btn_jour",
+                     type="primary" if st.session_state[f"{key_prefix}_view"]=="jour" else "secondary",
+                     use_container_width=True):
+            st.session_state[f"{key_prefix}_view"] = "jour"; st.rerun()
+    with bv2:
+        if st.button("📆 Mois", key=f"{key_prefix}_btn_mois",
+                     type="primary" if st.session_state[f"{key_prefix}_view"]=="mois" else "secondary",
+                     use_container_width=True):
+            st.session_state[f"{key_prefix}_view"] = "mois"; st.rerun()
+    return st.session_state[f"{key_prefix}_view"]
 
 # ═══════════════════ TRANCHE TOGGLE ═══════════════════════════════════════════
 def tranche_toggle(key_prefix):
@@ -247,6 +275,11 @@ def page_header(icon,title,subtitle):
 if page=="global":
     page_header("📊","DASHBOARD GLOBAL","Vue d'ensemble — 10 tranches × 25 jours · 3 départements · 4 produits")
 
+    # ── Vue Jours / Mois ──
+    st.markdown("<div class='sh'>🗓️ Mode de Visualisation Temporelle</div>",unsafe_allow_html=True)
+    view_mode = view_toggle("global")
+    st.markdown("---")
+
     sel_t=tranche_toggle("g")
     fc1,fc2=st.columns(2)
     with fc1: sel_prod=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key="g_prod")
@@ -270,7 +303,7 @@ if page=="global":
     with k4: st.markdown(kpi_card("PERFORMANCE TP",f"{tp_m:.1f}%","orange" if tp_m>=95 else "red",f"{flag(tp_m,95)} Seuil ≥ 95%"),unsafe_allow_html=True)
     st.markdown("<br>",unsafe_allow_html=True)
 
-    # ── Évolution KPIs par tranche ──
+    # ── Évolution KPIs par Tranche ──
     st.markdown("<div class='sh'>Évolution TRS · TD · TQ · TP par Tranche</div>",unsafe_allow_html=True)
     by_t=df.groupby("Tranche")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Tranche")
     fig_ev=go.Figure()
@@ -281,24 +314,21 @@ if page=="global":
     fig_ev.update_layout(height=300,**BL,xaxis=txax(by_t["Tranche"]),yaxis=ax(pct=True))
     fig_ev.update_yaxes(range=[0,110]); st.plotly_chart(fig_ev,use_container_width=True)
 
-    # ── Comparaison 3 depts vs norme NFE (image 1) ──
+    # ── Comparaison TRS 3 Depts vs Norme NFE ──
     st.markdown("<div class='sh'>Comparaison TRS — 3 Départements vs Norme NFE</div>",unsafe_allow_html=True)
-    dept_kpis={}
     comb_all=pd.concat(dfs.values(),ignore_index=True)
     comb_f=comb_all[comb_all["Tranche"].isin(sel_t)]
     if sel_prod!="Tous": comb_f=comb_f[comb_f["Produit"]==sel_prod]
+    dept_kpis={}
     for dept in ["Découpe","Usinage","Peinture"]:
         sub=comb_f[comb_f["Département"]==dept]
         if sub.empty: dept_kpis[dept]={"TD":0,"TP":0,"TQ":0,"TRS":0}
         else: dept_kpis[dept]={k:sub[k].mean()*100 for k in ["TD","TP","TQ","TRS"]}
 
-    # 4 mini KPI cards per dept showing TRS
     mc1,mc2,mc3=st.columns(3)
     for col_,dept in zip([mc1,mc2,mc3],["Découpe","Usinage","Peinture"]):
         with col_:
             v=dept_kpis[dept]["TRS"]; dc=DEPT_COLORS[dept]
-            status="✅ Au-dessus de la norme" if v>=85 else "⚠️ Sous norme"
-            sc="green" if v>=85 else "red"
             st.markdown(f"""<div style='background:#161b22;border:1px solid #21262d;border-radius:12px;padding:14px 18px;border-left:4px solid {dc}'>
 <div style='font-family:Rajdhani;font-size:1.5rem;font-weight:700;color:{dc}'>{v:.1f}%</div>
 <div style='font-size:0.7rem;color:#8b949e;margin:2px 0'>TRS — {dept}</div>
@@ -306,45 +336,103 @@ if page=="global":
 <div style='font-size:0.68rem;color:{"#3fb950" if v>=85 else "#f85149"};font-weight:600;margin-top:3px'>{"✅ Conforme" if v>=85 else "⚠️ Sous norme"}</div>
 </div>""",unsafe_allow_html=True)
 
-    # Grouped bar: TD TP TQ TRS par département avec norme
     kpis_ord=["TD","TP","TQ","TRS"]
     fig_cmp=go.Figure()
-    dept_bar_colors={"Découpe":"#58a6ff","Usinage":"#3fb950","Peinture":"#d29922"}
-    for dept,dc in dept_bar_colors.items():
+    for dept,dc in {"Découpe":"#58a6ff","Usinage":"#3fb950","Peinture":"#d29922"}.items():
         vals=[dept_kpis[dept][k] for k in kpis_ord]
         fig_cmp.add_trace(go.Bar(name=dept,x=kpis_ord,y=vals,marker_color=dc,
             marker_line_color="rgba(0,0,0,0)",
             text=[f"{v:.1f}%" for v in vals],textposition="outside",textfont=dict(color=TEXT,size=9)))
-    # Norme bars (light grey reference)
     norme_vals=[THRESHOLDS[k] for k in kpis_ord]
-    fig_cmp.add_trace(go.Bar(name="Norme",x=kpis_ord,y=norme_vals,
+    fig_cmp.add_trace(go.Bar(name="Norme NFE",x=kpis_ord,y=norme_vals,
         marker_color="rgba(110,118,129,0.3)",marker_line_color="rgba(110,118,129,0.5)",
         marker_line_width=1,text=[f"{v}%" for v in norme_vals],
         textposition="outside",textfont=dict(color=MUTED,size=9)))
-    fig_cmp.update_layout(barmode="group",height=320,**BL,xaxis=ax(),yaxis=ax(pct=True))
-    fig_cmp.update_layout(title=dict(text="Comparaison TRS — 3 départements vs norme NFE",font=dict(color=MUTED,size=11)))
+    fig_cmp.update_layout(barmode="group",height=340,**BL,xaxis=ax(),yaxis=ax(pct=True))
+    fig_cmp.update_layout(title=dict(text="Comparaison TRS/TD/TQ/TP — 3 départements vs Norme NFE",font=dict(color=MUTED,size=11)))
     fig_cmp.update_yaxes(range=[0,115]); st.plotly_chart(fig_cmp,use_container_width=True)
 
-    # ── TRS journalier J1-250, 3 depts ──
-    st.markdown("<div class='sh'>TRS Journalier J1→J250 — 3 Départements</div>",unsafe_allow_html=True)
-    fig_jg=go.Figure()
-    pal_bg=["rgba(88,166,255,0.04)","rgba(63,185,80,0.04)","rgba(210,153,34,0.04)",
-            "rgba(163,113,247,0.04)","rgba(248,81,73,0.04)"]
-    for t in range(1,11):
-        j0=(t-1)*25+1; j1=t*25
-        fig_jg.add_vrect(x0=j0,x1=j1,fillcolor=pal_bg[(t-1)%5],layer="below",line_width=0)
-        fig_jg.add_annotation(x=(j0+j1)/2,y=107,text=f"T{t}",showarrow=False,font=dict(color=MUTED,size=8),yref="y")
-    for dept,dc in DEPT_COLORS.items():
-        sub_d=comb_f[comb_f["Département"]==dept].groupby("Journée")["TRS"].mean().reset_index().sort_values("Journée")
-        if sub_d.empty: continue
-        fig_jg.add_trace(go.Scatter(x=sub_d["Journée"],y=sub_d["TRS"]*100,name=dept,
-            line=dict(color=dc,width=1.5),mode="lines"))
-    fig_jg.add_hline(y=85,line_dash="dash",line_color="#f85149",line_width=1.5,
-                     annotation_text="Seuil 85%",annotation_font=dict(color="#f85149",size=9))
-    fig_jg.update_layout(height=260,**BL,xaxis=ax(title="Journée (1–250)"),yaxis=ax(pct=True))
-    fig_jg.update_yaxes(range=[0,110]); st.plotly_chart(fig_jg,use_container_width=True)
+    # ── TRS journalier / mensuel selon view_mode ──
+    if view_mode == "jour":
+        st.markdown("<div class='sh'>📅 TRS Journalier J1→J250 — 3 Départements</div>",unsafe_allow_html=True)
+        fig_jg=go.Figure()
+        pal_bg=["rgba(88,166,255,0.04)","rgba(63,185,80,0.04)","rgba(210,153,34,0.04)",
+                "rgba(163,113,247,0.04)","rgba(248,81,73,0.04)"]
+        for t in range(1,11):
+            j0=(t-1)*25+1; j1=t*25
+            fig_jg.add_vrect(x0=j0,x1=j1,fillcolor=pal_bg[(t-1)%5],layer="below",line_width=0)
+            fig_jg.add_annotation(x=(j0+j1)/2,y=107,text=f"T{t}",showarrow=False,font=dict(color=MUTED,size=8),yref="y")
+        for dept,dc in DEPT_COLORS.items():
+            sub_d=comb_f[comb_f["Département"]==dept].groupby("Journée")["TRS"].mean().reset_index().sort_values("Journée")
+            if sub_d.empty: continue
+            fig_jg.add_trace(go.Scatter(x=sub_d["Journée"],y=sub_d["TRS"]*100,name=dept,
+                line=dict(color=dc,width=1.5),mode="lines"))
+        fig_jg.add_hline(y=85,line_dash="dash",line_color="#f85149",line_width=1.5,
+                         annotation_text="Seuil 85%",annotation_font=dict(color="#f85149",size=9))
+        fig_jg.update_layout(height=280,**BL,xaxis=ax(title="Journée (1–250)"),yaxis=ax(pct=True))
+        fig_jg.update_yaxes(range=[0,110]); st.plotly_chart(fig_jg,use_container_width=True)
 
-    # ── TRS par dept + produit ──
+        # KPIs journaliers par département
+        st.markdown("<div class='sh'>📅 KPIs Journaliers (TD · TQ · TP) — 3 Départements</div>",unsafe_allow_html=True)
+        fig_kj = make_subplots(rows=3, cols=1, shared_xaxes=True,
+                               subplot_titles=["TD (Disponibilité)","TQ (Qualité)","TP (Performance)"],
+                               vertical_spacing=0.08)
+        kpi_list=[("TD","#3fb950",90),("TQ","#d29922",98),("TP","#a371f7",95)]
+        for ri,(kpi,kc,thresh) in enumerate(kpi_list,1):
+            for dept,dc in DEPT_COLORS.items():
+                sub_d=comb_f[comb_f["Département"]==dept].groupby("Journée")[kpi].mean().reset_index().sort_values("Journée")
+                if sub_d.empty: continue
+                fig_kj.add_trace(go.Scatter(x=sub_d["Journée"],y=sub_d[kpi]*100,name=f"{dept} – {kpi}" if ri==1 else dept,
+                    line=dict(color=dc,width=1.2),mode="lines",showlegend=(ri==1)),row=ri,col=1)
+            fig_kj.add_hline(y=thresh,line_dash="dash",line_color=THRESH_COLORS[kpi],line_width=1,row=ri,col=1)
+        fig_kj.update_layout(height=500,**BL)
+        fig_kj.update_yaxes(ticksuffix="%",range=[0,110],gridcolor="#1e2430",tickfont=dict(color=MUTED,size=9))
+        fig_kj.update_xaxes(gridcolor="#1e2430",tickfont=dict(color=MUTED,size=9),title_text="Journée",row=3,col=1)
+        st.plotly_chart(fig_kj,use_container_width=True)
+
+    else:  # Mois
+        st.markdown("<div class='sh'>📆 TRS Mensuel (M1→M12) — 3 Départements</div>",unsafe_allow_html=True)
+        fig_mg=go.Figure()
+        for dept,dc in DEPT_COLORS.items():
+            sub_m=comb_f[comb_f["Département"]==dept].groupby("Mois")["TRS"].mean().reset_index().sort_values("Mois")
+            if sub_m.empty: continue
+            fig_mg.add_trace(go.Scatter(x=sub_m["Mois"],y=sub_m["TRS"]*100,name=dept,
+                line=dict(color=dc,width=2.5),mode="lines+markers",marker=dict(size=8)))
+        fig_mg.add_hline(y=85,line_dash="dash",line_color="#f85149",line_width=1.5,
+                         annotation_text="Seuil 85%",annotation_font=dict(color="#f85149",size=9))
+        fig_mg.update_layout(height=280,**BL,
+            xaxis=dict(**ax(),tickmode="array",tickvals=list(range(1,13)),
+                       ticktext=[f"M{i}" for i in range(1,13)],title=dict(text="Mois",font=dict(color=MUTED,size=10))),
+            yaxis=ax(pct=True))
+        fig_mg.update_yaxes(range=[0,110]); st.plotly_chart(fig_mg,use_container_width=True)
+
+        # Barres mensuelles par KPI
+        st.markdown("<div class='sh'>📆 Évolution Mensuelle TD · TQ · TP — 3 Départements</div>",unsafe_allow_html=True)
+        fig_bm=make_subplots(rows=1,cols=3,subplot_titles=["TD (Disponibilité)","TQ (Qualité)","TP (Performance)"])
+        kpi_list2=[("TD","#3fb950",90),("TQ","#d29922",98),("TP","#a371f7",95)]
+        for ci,(kpi,kc,thresh) in enumerate(kpi_list2,1):
+            for dept,dc in DEPT_COLORS.items():
+                sub_m=comb_f[comb_f["Département"]==dept].groupby("Mois")[kpi].mean().reset_index().sort_values("Mois")
+                if sub_m.empty: continue
+                fig_bm.add_trace(go.Bar(name=dept,x=[f"M{int(m)}" for m in sub_m["Mois"]],
+                    y=sub_m[kpi]*100,marker_color=dc,showlegend=(ci==1)),row=1,col=ci)
+            fig_bm.add_hline(y=thresh,line_dash="dash",line_color=THRESH_COLORS[kpi],line_width=1.2,row=1,col=ci)
+        fig_bm.update_layout(height=330,**BL,barmode="group")
+        fig_bm.update_yaxes(ticksuffix="%",range=[0,115],gridcolor="#1e2430",tickfont=dict(color=MUTED,size=9))
+        fig_bm.update_xaxes(gridcolor="#1e2430",tickfont=dict(color=MUTED,size=9))
+        st.plotly_chart(fig_bm,use_container_width=True)
+
+        # Tableau récap mensuel
+        st.markdown("<div class='sh'>📋 Synthèse Mensuelle — Moyennes par Mois</div>",unsafe_allow_html=True)
+        mois_rows=[]
+        for m in sorted(df["Mois"].unique()):
+            s=df[df["Mois"]==m]
+            mois_rows.append({"Mois":f"M{int(m)}","Jours":f"{(int(m)-1)*21+1}–{int(m)*21}",
+                              "TRS %":round(s["TRS"].mean()*100,2),"TD %":round(s["TD"].mean()*100,2),
+                              "TQ %":round(s["TQ"].mean()*100,2),"TP %":round(s["TP"].mean()*100,2)})
+        st.dataframe(pd.DataFrame(mois_rows),use_container_width=True,hide_index=True,column_config=pbar_cfg())
+
+    # ── TRS par dept × tranche + par produit ──
     cl,cr=st.columns(2)
     with cl:
         st.markdown("<div class='sh'>TRS par Département × Tranche</div>",unsafe_allow_html=True)
@@ -393,6 +481,11 @@ def dept_page(dept_name):
     icons={"Découpe":"🪚","Usinage":"⚙️","Peinture":"🎨"}
     page_header(icons[dept_name],f"DÉPARTEMENT {dept_name.upper()}","10 tranches × 25 jours — filtrage interactif — seuils TPM")
 
+    # ── Vue Jours / Mois ──
+    st.markdown("<div class='sh'>🗓️ Mode de Visualisation Temporelle</div>",unsafe_allow_html=True)
+    view_mode = view_toggle(f"dept_{dept_name[:2]}")
+    st.markdown("---")
+
     sel_t=tranche_toggle(f"d{dept_name[:2]}")
     sel_prod=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key=f"p_{dept_name}")
     if not sel_t: st.warning("Sélectionnez au moins une tranche."); return
@@ -418,7 +511,7 @@ def dept_page(dept_name):
     with cg3: st.plotly_chart(gauge(tq_m,"TQ","#3fb950",98),use_container_width=True,key=f"g3_{dept_name}")
     with cg4: st.plotly_chart(gauge(tp_m,"TP","#d29922",95),use_container_width=True,key=f"g4_{dept_name}")
 
-    # Courbe combinée
+    # Courbe combinée par tranche
     st.markdown("<div class='sh'>Évolution TRS · TD · TQ · TP par Tranche</div>",unsafe_allow_html=True)
     by_t=df.groupby("Tranche")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Tranche")
     fig_t=go.Figure()
@@ -428,6 +521,76 @@ def dept_page(dept_name):
     add_thresh(fig_t,["TRS","TD","TQ","TP"])
     fig_t.update_layout(height=295,**BL,xaxis=txax(by_t["Tranche"]),yaxis=ax(pct=True))
     fig_t.update_yaxes(range=[0,110]); st.plotly_chart(fig_t,use_container_width=True)
+
+    # ── Vue Jours ou Mois ──
+    if view_mode == "jour":
+        st.markdown(f"<div class='sh'>📅 Évolution Journalière TRS — {dept_name} (J1→J250)</div>",unsafe_allow_html=True)
+        fig_dj=go.Figure()
+        daily=df.groupby("Journée")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Journée")
+        for kpi,c in KPI_COLORS.items():
+            fig_dj.add_trace(go.Scatter(x=daily["Journée"],y=daily[kpi]*100,name=kpi,
+                line=dict(color=c,width=1.5),mode="lines"))
+        for kpi in ["TRS","TD","TQ","TP"]:
+            fig_dj.add_hline(y=THRESHOLDS[kpi],line_dash="dash",line_color=THRESH_COLORS[kpi],line_width=1)
+        # Colorier les tranches
+        pal_bg=["rgba(88,166,255,0.04)","rgba(63,185,80,0.04)","rgba(210,153,34,0.04)",
+                "rgba(163,113,247,0.04)","rgba(248,81,73,0.04)"]
+        for t in range(1,11):
+            j0=(t-1)*25+1; j1=t*25
+            fig_dj.add_vrect(x0=j0,x1=j1,fillcolor=pal_bg[(t-1)%5],layer="below",line_width=0)
+            fig_dj.add_annotation(x=(j0+j1)/2,y=108,text=f"T{t}",showarrow=False,font=dict(color=MUTED,size=8),yref="y")
+        fig_dj.update_layout(height=310,**BL,xaxis=ax(title="Journée (1–250)"),yaxis=ax(pct=True))
+        fig_dj.update_yaxes(range=[0,112]); st.plotly_chart(fig_dj,use_container_width=True)
+
+        # Tableau journalier détaillé (derniers 10 jours)
+        st.markdown(f"<div class='sh'>📋 Détail Journalier — {dept_name} (25 derniers jours)</div>",unsafe_allow_html=True)
+        last25=df.sort_values("Journée").tail(25)[["Journée","Produit","TRS","TD","TQ","TP","Panne","Arrêts_mineurs","Rejet_qualité"]].copy()
+        last25["TRS"]=last25["TRS"].mul(100).round(2); last25["TD"]=last25["TD"].mul(100).round(2)
+        last25["TQ"]=last25["TQ"].mul(100).round(2); last25["TP"]=last25["TP"].mul(100).round(2)
+        last25.columns=["Journée","Produit","TRS %","TD %","TQ %","TP %","Pannes (min)","Arrêts min.","Rejet qualité"]
+        st.dataframe(last25,use_container_width=True,hide_index=True,
+                     column_config={"TRS %":st.column_config.ProgressColumn("TRS %",min_value=0,max_value=100,format="%.2f%%"),
+                                    "TD %":st.column_config.ProgressColumn("TD %",min_value=0,max_value=100,format="%.2f%%"),
+                                    "TQ %":st.column_config.ProgressColumn("TQ %",min_value=0,max_value=100,format="%.2f%%"),
+                                    "TP %":st.column_config.ProgressColumn("TP %",min_value=0,max_value=100,format="%.2f%%")})
+
+    else:  # Mois
+        st.markdown(f"<div class='sh'>📆 Évolution Mensuelle TRS · TD · TQ · TP — {dept_name}</div>",unsafe_allow_html=True)
+        by_m=df.groupby("Mois")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Mois")
+        fig_mm=go.Figure()
+        for kpi,c in KPI_COLORS.items():
+            fig_mm.add_trace(go.Scatter(x=by_m["Mois"],y=by_m[kpi]*100,name=kpi,
+                line=dict(color=c,width=2.5),mode="lines+markers",marker=dict(size=9),
+                fill="tozeroy",fillcolor=FILL_COLORS[kpi]))
+        add_thresh(fig_mm,["TRS","TD","TQ","TP"])
+        fig_mm.update_layout(height=310,**BL,
+            xaxis=dict(**ax(),tickmode="array",tickvals=list(range(1,13)),
+                       ticktext=[f"M{i}" for i in range(1,13)],title=dict(text="Mois",font=dict(color=MUTED,size=10))),
+            yaxis=ax(pct=True))
+        fig_mm.update_yaxes(range=[0,112]); st.plotly_chart(fig_mm,use_container_width=True)
+
+        # Barres mensuelles groupées
+        st.markdown(f"<div class='sh'>📆 TRS · TD · TQ · TP par Mois — Vue Bâtonnets — {dept_name}</div>",unsafe_allow_html=True)
+        fig_barm=go.Figure()
+        m_labels=[f"M{int(m)}" for m in by_m["Mois"]]
+        for kpi,c in KPI_COLORS.items():
+            fig_barm.add_trace(go.Bar(name=kpi,x=m_labels,y=by_m[kpi]*100,marker_color=c,
+                text=[f"{v*100:.1f}%" for v in by_m[kpi]],textposition="outside",textfont=dict(color=TEXT,size=8)))
+        for kpi in ["TRS","TD","TQ","TP"]:
+            fig_barm.add_hline(y=THRESHOLDS[kpi],line_dash="dash",line_color=THRESH_COLORS[kpi],line_width=1.2)
+        fig_barm.update_layout(barmode="group",height=310,**BL,xaxis=ax(title="Mois"),yaxis=ax(pct=True))
+        fig_barm.update_yaxes(range=[0,115]); st.plotly_chart(fig_barm,use_container_width=True)
+
+        # Tableau mensuel
+        st.markdown(f"<div class='sh'>📋 Tableau Mensuel — {dept_name}</div>",unsafe_allow_html=True)
+        mois_rows=[]
+        for m in sorted(df["Mois"].unique()):
+            s=df[df["Mois"]==m]
+            mois_rows.append({"Mois":f"M{int(m)}","Jours approx.":f"J{(int(m)-1)*21+1}–J{int(m)*21}",
+                              "TRS %":round(s["TRS"].mean()*100,2),"TD %":round(s["TD"].mean()*100,2),
+                              "TQ %":round(s["TQ"].mean()*100,2),"TP %":round(s["TP"].mean()*100,2),
+                              "Pannes (min)":int(s["Panne"].sum()),"Rejets":int(s["Rejet_qualité"].sum())})
+        st.dataframe(pd.DataFrame(mois_rows),use_container_width=True,hide_index=True,column_config=pbar_cfg())
 
     # 4 courbes individuelles
     st.markdown("<div class='sh'>Évolution individuelle TRS · TD · TQ · TP</div>",unsafe_allow_html=True)
@@ -533,10 +696,10 @@ elif page=="usinage": dept_page("Usinage")
 elif page=="peinture":dept_page("Peinture")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SOURCE DES PERTES
+# SOURCE DES PERTES — VERSION COMPLÈTE ULTRA-DÉTAILLÉE
 # ═══════════════════════════════════════════════════════════════════════════════
 elif page=="pertes":
-    page_header("🔍","SOURCE DES PERTES","Analyse causale — 3 familles · 11 sources · démarche TPM")
+    page_header("🔍","SOURCE DES PERTES","Analyse causale complète — 3 familles · 11 sources · démarche TPM · Comparaison NFE")
 
     with st.expander("📖 Fondement méthodologique — Démarche TPM",expanded=False):
         st.markdown("""<div style='color:#c9d1d9;font-size:0.82rem;line-height:1.9'>
@@ -560,97 +723,332 @@ elif page=="pertes":
     if sel_prod_p!="Tous": df_p=df_p[df_p["Produit"]==sel_prod_p]
     if df_p.empty: st.warning("Aucune donnée."); st.stop()
 
-    pdef={"Pannes":("Panne","TD","#f85149"),"Remplacement préventif":("Remplacement_préventif","TD","#c9362e"),
-          "Arrêts mineurs":("Arrêts_mineurs","TP","#d29922"),"Nettoyage":("Nettoyage","TP","#e3b341"),
-          "Réglage dérive":("Réglage_dérive","TP","#f0c040"),"Inspection":("Inspection","TP","#ffd166"),
-          "Changement outil":("Changement_outil","TP","#ffb347"),"Déplacement":("Déplacement","TP","#f4845f"),
+    pdef={"Pannes":("Panne","TD","#f85149"),
+          "Remplacement préventif":("Remplacement_préventif","TD","#c9362e"),
+          "Arrêts mineurs":("Arrêts_mineurs","TP","#d29922"),
+          "Nettoyage":("Nettoyage","TP","#e3b341"),
+          "Réglage dérive":("Réglage_dérive","TP","#f0c040"),
+          "Inspection":("Inspection","TP","#ffd166"),
+          "Changement outil":("Changement_outil","TP","#ffb347"),
+          "Déplacement":("Déplacement","TP","#f4845f"),
           "Lubrification":("Lubrification","TP","#c77dff"),
-          "Rejet démarrage":("Rejet_Démarrage","TQ","#3fb950"),"Rejet qualité":("Rejet_qualité","TQ","#56d364")}
+          "Rejet démarrage":("Rejet_Démarrage","TQ","#3fb950"),
+          "Rejet qualité":("Rejet_qualité","TQ","#56d364")}
     pv={l:df_p[c].fillna(0).sum() for l,(c,_,_) in pdef.items()}
 
-    st.markdown("<br>",unsafe_allow_html=True)
-    pk1,pk2,pk3=st.columns(3)
     td_l=pv["Pannes"]+pv["Remplacement préventif"]
     tp_l=sum(pv[l] for l,(_,f,_) in pdef.items() if f=="TP")
     tq_l=pv["Rejet démarrage"]+pv["Rejet qualité"]
-    with pk1: st.markdown(kpi_card("PERTES TD",f"{td_l:,.0f} min","red","Pannes + Maint. préventive"),unsafe_allow_html=True)
-    with pk2: st.markdown(kpi_card("PERTES TP",f"{tp_l:,.0f} min","orange","7 sources"),unsafe_allow_html=True)
-    with pk3: st.markdown(kpi_card("PERTES TQ",f"{tq_l:,.0f} pcs","teal","Rejets démarrage + qualité"),unsafe_allow_html=True)
+    total_all=td_l+tp_l+tq_l if (td_l+tp_l+tq_l)>0 else 1
+
+    # ══════════════════════════════════════════════════
+    # SECTION 1 — KPI Cards
+    # ══════════════════════════════════════════════════
+    st.markdown("<br>",unsafe_allow_html=True)
+    pk1,pk2,pk3,pk4=st.columns(4)
+    with pk1: st.markdown(kpi_card("PERTES TD",f"{td_l:,.0f} min","red",f"🔴 {td_l/total_all*100:.1f}% du total · 2 sources"),unsafe_allow_html=True)
+    with pk2: st.markdown(kpi_card("PERTES TP",f"{tp_l:,.0f} min","orange",f"🟡 {tp_l/total_all*100:.1f}% du total · 7 sources"),unsafe_allow_html=True)
+    with pk3: st.markdown(kpi_card("PERTES TQ",f"{tq_l:,.0f} pcs","teal",f"🟢 {tq_l/total_all*100:.1f}% du total · 2 sources"),unsafe_allow_html=True)
+    with pk4: st.markdown(kpi_card("TOTAL PERTES",f"{total_all:,.0f}","purple","11 sources combinées"),unsafe_allow_html=True)
     st.markdown("<br>",unsafe_allow_html=True)
 
+    # ══════════════════════════════════════════════════
+    # SECTION 2 — Impact sur TRS par famille
+    # ══════════════════════════════════════════════════
+    st.markdown("<div class='sh'>📉 Impact des Familles de Pertes sur le TRS — Waterfall</div>",unsafe_allow_html=True)
+    st.markdown("""<div class='infobox'>
+<strong style='color:#f0883e'>Lecture du Waterfall :</strong>
+Ce graphe montre comment chaque famille de pertes <em>érode</em> le TRS théorique (100%) pour atteindre le TRS réel.
+Les barres rouges indiquent la perte de disponibilité, orange la perte de performance, verte la perte de qualité.</div>""",unsafe_allow_html=True)
+
+    trs_global=df_p["TRS"].mean()*100
+    td_global=df_p["TD"].mean()*100
+    tq_global=df_p["TQ"].mean()*100
+    tp_global=df_p["TP"].mean()*100
+    perte_td=100-td_global; perte_tp=100-tp_global; perte_tq=100-tq_global
+
+    wf_labels=["TRS Théorique (100%)",f"Perte TD (-{perte_td:.1f}%)",f"Perte TP (-{perte_tp:.1f}%)",f"Perte TQ (-{perte_tq:.1f}%)","TRS Réel"]
+    wf_measure=["absolute","relative","relative","relative","total"]
+    wf_y=[100,-perte_td,-perte_tp,-perte_tq,0]
+    wf_colors=["#58a6ff","#f85149","#d29922","#3fb950","#a371f7"]
+
+    fig_wf=go.Figure(go.Waterfall(
+        name="",measure=wf_measure,x=wf_labels,y=wf_y,
+        connector={"line":{"color":"#30363d","width":1}},
+        decreasing={"marker":{"color":"#f85149"}},
+        increasing={"marker":{"color":"#3fb950"}},
+        totals={"marker":{"color":"#58a6ff"}},
+        text=[f"{v:.1f}%" if v!=0 else f"{trs_global:.1f}%" for v in wf_y],
+        textfont=dict(color="white",size=11),
+        textposition="outside"))
+    fig_wf.update_layout(height=300,**BL,yaxis=ax(pct=True,title="% TRS"))
+    fig_wf.update_yaxes(range=[0,115]); st.plotly_chart(fig_wf,use_container_width=True)
+
+    # ══════════════════════════════════════════════════
+    # SECTION 3 — Comparaison vs Norme NFE (NOUVEAU)
+    # ══════════════════════════════════════════════════
+    st.markdown("<div class='sh'>🏅 Comparaison TRS/TD/TQ/TP — Tous Départements vs Norme NFE</div>",unsafe_allow_html=True)
+    st.markdown("""<div class='infobox'>
+<strong style='color:#f0883e'>Norme NFE :</strong>
+Les seuils TPM de référence (NFE) sont : TRS ≥ 85% · TD ≥ 90% · TQ ≥ 98% · TP ≥ 95%.
+Ce graphe compare chaque département à ces normes pour identifier les <em>écarts critiques</em>.</div>""",unsafe_allow_html=True)
+
+    # KPIs par département (toutes tranches sélectionnées)
+    dept_kpis_all={}
+    comb_all2=pd.concat(dfs.values(),ignore_index=True)
+    comb_f2=comb_all2[comb_all2["Tranche"].isin(sel_t_p)]
+    if sel_prod_p!="Tous": comb_f2=comb_f2[comb_f2["Produit"]==sel_prod_p]
+    for dept in ["Découpe","Usinage","Peinture"]:
+        sub=comb_f2[comb_f2["Département"]==dept]
+        if sub.empty: dept_kpis_all[dept]={"TD":0,"TP":0,"TQ":0,"TRS":0,"Pannes":0,"Rejets":0}
+        else:
+            dept_kpis_all[dept]={k:sub[k].mean()*100 for k in ["TD","TP","TQ","TRS"]}
+            dept_kpis_all[dept]["Pannes"]=sub["Panne"].fillna(0).sum()
+            dept_kpis_all[dept]["Rejets"]=sub["Rejet_qualité"].fillna(0).sum()
+
+    # Mini cartes par département vs NFE
+    nfe_cols=st.columns(3)
+    for col_,dept in zip(nfe_cols,["Découpe","Usinage","Peinture"]):
+        with col_:
+            dc=DEPT_COLORS[dept]; dk=dept_kpis_all[dept]
+            ecarts={k:max(0,THRESHOLDS[k]-dk[k]) for k in ["TRS","TD","TQ","TP"]}
+            total_ecart=sum(ecarts.values())
+            badge_col="#f85149" if total_ecart>10 else "#d29922" if total_ecart>0 else "#3fb950"
+            badge_txt="Critique" if total_ecart>10 else "Attention" if total_ecart>0 else "Conforme"
+            st.markdown(f"""<div style='background:#161b22;border:1px solid #21262d;border-radius:12px;padding:16px 18px;border-left:4px solid {dc};margin-bottom:8px'>
+<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>
+  <span style='font-family:Rajdhani;font-size:1.1rem;font-weight:700;color:{dc}'>{dept}</span>
+  <span class='badge' style='background:{badge_col}22;color:{badge_col};border:1px solid {badge_col}'>{badge_txt}</span>
+</div>""",unsafe_allow_html=True)
+            for kpi in ["TRS","TD","TQ","TP"]:
+                v=dk[kpi]; t=THRESHOLDS[kpi]; ec=max(0,t-v)
+                bar_pct=min(v,100); bar_c="#3fb950" if v>=t else "#f85149"
+                st.markdown(f"""<div style='margin-bottom:10px'>
+<div style='display:flex;justify-content:space-between;font-size:0.72rem;color:#8b949e;margin-bottom:2px'>
+  <span><strong style='color:#e6edf3'>{kpi}</strong></span>
+  <span style='color:{"#3fb950" if v>=t else "#f85149"}'>{v:.1f}% / {t}% {"✅" if v>=t else f"⚠️ -{ec:.1f}pt"}</span>
+</div>
+<div style='background:#1c2128;border-radius:4px;height:5px'>
+  <div style='background:{bar_c};height:5px;border-radius:4px;width:{bar_pct}%'></div>
+</div></div>""",unsafe_allow_html=True)
+            st.markdown(f"""<div style='border-top:1px solid #21262d;padding-top:8px;margin-top:4px;font-size:0.7rem;color:#8b949e'>
+Pannes : <strong style='color:#f85149'>{dk["Pannes"]:,.0f} min</strong> · 
+Rejets : <strong style='color:#3fb950'>{dk["Rejets"]:,.0f} pcs</strong> · 
+Écart total : <strong style='color:{badge_col}'>{total_ecart:.1f} pts</strong></div>
+</div>""",unsafe_allow_html=True)
+
+    # Graphe radar NFE comparaison
+    st.markdown("<div class='sh'>🕸️ Radar — Positionnement vs Norme NFE par Département</div>",unsafe_allow_html=True)
+    categories=["TRS","TD","TQ","TP","TRS"]  # fermer le radar
+    fig_rad=go.Figure()
+    for dept,dc in DEPT_COLORS.items():
+        vals=[dept_kpis_all[dept][k] for k in ["TRS","TD","TQ","TP"]]+[dept_kpis_all[dept]["TRS"]]
+        fig_rad.add_trace(go.Scatterpolar(r=vals,theta=categories,fill="toself",
+            name=dept,line=dict(color=dc,width=2),fillcolor=dc.replace("ff","22").replace("#","rgba(").replace("22","0.12)") if len(dc)==7 else dc))
+    # Norme NFE
+    nfe_vals=[THRESHOLDS[k] for k in ["TRS","TD","TQ","TP"]]+[THRESHOLDS["TRS"]]
+    fig_rad.add_trace(go.Scatterpolar(r=nfe_vals,theta=categories,fill="toself",
+        name="Norme NFE",line=dict(color="#8b949e",width=2,dash="dash"),
+        fillcolor="rgba(139,148,158,0.06)"))
+    fig_rad.update_layout(height=380,**BL,
+        polar=dict(bgcolor="#161b22",
+                   radialaxis=dict(range=[0,115],ticksuffix="%",gridcolor="#21262d",
+                                   tickfont=dict(color=MUTED,size=9)),
+                   angularaxis=dict(gridcolor="#21262d",tickfont=dict(color=TEXT,size=12))))
+    st.plotly_chart(fig_rad,use_container_width=True)
+
+    # Barres empilées écart vs norme
+    st.markdown("<div class='sh'>📊 Écart par KPI vs Norme NFE — Tous Départements</div>",unsafe_allow_html=True)
+    fig_gap=go.Figure()
+    kpis_nfe=["TRS","TD","TQ","TP"]
+    x_dept=["Découpe","Usinage","Peinture"]
+    gap_colors={"TRS":"#58a6ff","TD":"#3fb950","TQ":"#d29922","TP":"#a371f7"}
+    for kpi in kpis_nfe:
+        vals=[]
+        for dept in x_dept:
+            ecart=dept_kpis_all[dept][kpi]-THRESHOLDS[kpi]
+            vals.append(round(ecart,2))
+        fig_gap.add_trace(go.Bar(name=kpi,x=x_dept,y=vals,marker_color=gap_colors[kpi],
+            text=[f"{v:+.1f}%" for v in vals],textposition="outside",textfont=dict(color=TEXT,size=10)))
+    fig_gap.add_hline(y=0,line_color="#8b949e",line_width=1.5)
+    fig_gap.update_layout(barmode="group",height=290,**BL,
+        title=dict(text="Écart (+ = au-dessus norme, − = sous norme)",font=dict(color=MUTED,size=11)),
+        xaxis=ax(),yaxis=ax(pct=True))
+    st.plotly_chart(fig_gap,use_container_width=True)
+
+    # ══════════════════════════════════════════════════
+    # SECTION 4 — Pareto + Donut
+    # ══════════════════════════════════════════════════
     cl2,cr2=st.columns(2)
     with cl2:
-        st.markdown("<div class='sh'>Diagramme de Pareto des Pertes</div>",unsafe_allow_html=True)
-        st.markdown("""<div class='infobox'><strong style='color:#f0883e'>À quoi sert le Pareto ?</strong>
-Il applique la <strong>règle 80/20</strong> : 80% des pertes proviennent de 20% des causes.
-Les sources sont triées de la plus impactante à gauche. La <strong>courbe orange</strong> montre le cumul en %.
-<strong>Concentrez les actions sur les barres à gauche de la ligne 80%</strong> — c'est là que l'effort est le plus rentable.</div>""",unsafe_allow_html=True)
+        st.markdown("<div class='sh'>📊 Diagramme de Pareto des Pertes (Règle 80/20)</div>",unsafe_allow_html=True)
+        st.markdown("""<div class='infobox'><strong style='color:#f0883e'>Règle 80/20 :</strong>
+80% des pertes proviennent de 20% des causes. Concentrez les actions sur les <strong>barres à gauche de la ligne 80%</strong>.</div>""",unsafe_allow_html=True)
         sp=dict(sorted(pv.items(),key=lambda x:x[1],reverse=True))
         labels=list(sp.keys()); vals=list(sp.values())
         cumul=np.cumsum(vals)/max(sum(vals),1)*100
         bar_c=[pdef[l][2] for l in labels]
         fig_par=make_subplots(specs=[[{"secondary_y":True}]])
-        fig_par.add_trace(go.Bar(x=labels,y=vals,name="Total",marker_color=bar_c,marker_line_color="rgba(0,0,0,0)"),secondary_y=False)
-        fig_par.add_trace(go.Scatter(x=labels,y=cumul,name="Cumulé %",line=dict(color="#f0883e",width=2),mode="lines+markers"),secondary_y=True)
-        fig_par.add_hline(y=80,line_dash="dot",line_color="#8b949e",line_width=1,
-                          annotation_text="80%",annotation_font=dict(color=MUTED,size=9),secondary_y=True)
-        fig_par.update_layout(height=310,**BL,xaxis=ax(angle=30),yaxis=ax(),
-                              yaxis2=dict(ticksuffix="%",tickfont=dict(color=MUTED,size=10),gridcolor="#1e2430"))
+        fig_par.add_trace(go.Bar(x=labels,y=vals,name="Total (min/pcs)",marker_color=bar_c,
+            marker_line_color="rgba(0,0,0,0)",
+            text=[f"{int(v)}" for v in vals],textposition="outside",textfont=dict(color=TEXT,size=8)),secondary_y=False)
+        fig_par.add_trace(go.Scatter(x=labels,y=cumul,name="Cumulé %",
+            line=dict(color="#f0883e",width=2.5),mode="lines+markers",marker=dict(size=8,color="#f0883e")),secondary_y=True)
+        fig_par.add_hline(y=80,line_dash="dot",line_color="#8b949e",line_width=1.5,
+                          annotation_text="Seuil 80%",annotation_font=dict(color=MUTED,size=9),secondary_y=True)
+        fig_par.update_layout(height=340,**BL,xaxis=ax(angle=35),yaxis=ax(title="Quantité (min / pcs)"),
+                              yaxis2=dict(ticksuffix="%",tickfont=dict(color=MUTED,size=10),gridcolor="#1e2430",range=[0,110]))
         st.plotly_chart(fig_par,use_container_width=True)
 
     with cr2:
-        st.markdown("<div class='sh'>Répartition — Anneau TPM (6 Grandes Pertes)</div>",unsafe_allow_html=True)
-        # 6 grandes pertes TPM avec pourcentages (comme image 2)
-        total_all=td_l+tp_l+tq_l if (td_l+tp_l+tq_l)>0 else 1
-        # Group into 6 TPM categories
-        vitesse_reduite=pv["Arrêts_mineurs"] if "Arrêts_mineurs" in pv else pv.get("Arrêts mineurs",0)
-        pannes_machines=pv["Pannes"]
+        st.markdown("<div class='sh'>🍩 Répartition — 6 Grandes Pertes TPM</div>",unsafe_allow_html=True)
+        vitesse_reduite=pv.get("Arrêts mineurs",0)
+        pannes_machines=pv.get("Pannes",0)
         rejets_qual=tq_l
-        arrets_min=pv.get("Nettoyage",0)+pv.get("Réglage dérive",0)+pv.get("Changement outil",0)
+        arrets_min2=pv.get("Nettoyage",0)+pv.get("Réglage dérive",0)+pv.get("Changement outil",0)
         demarrages=pv.get("Rejet démarrage",0)
-        nettoyage_reglage=pv.get("Lubrification",0)+pv.get("Déplacement",0)+pv.get("Inspection",0)
-
-        donut_vals=[vitesse_reduite,pannes_machines,rejets_qual,arrets_min,demarrages,nettoyage_reglage]
-        donut_labels=["Vitesse réduite (TP)","Pannes machines","Rejets qualité",
-                      "Arrêts mineurs","Démarrages","Nettoyage/Réglage"]
+        nettoyage_reglage2=pv.get("Lubrification",0)+pv.get("Déplacement",0)+pv.get("Inspection",0)
+        donut_vals=[vitesse_reduite,pannes_machines,rejets_qual,arrets_min2,demarrages,nettoyage_reglage2]
+        donut_labels=["Vitesse réduite (TP)","Pannes machines (TD)","Rejets qualité (TQ)",
+                      "Arrêts mineurs (TP)","Démarrages (TQ)","Nettoyage/Réglage (TP)"]
         donut_colors=["#58a6ff","#f85149","#3fb950","#d29922","#a371f7","#39d353"]
         total_d=sum(donut_vals) if sum(donut_vals)>0 else 1
         pcts=[v/total_d*100 for v in donut_vals]
-
         fig_do=go.Figure(go.Pie(
-            labels=[f"{l} {p:.0f}%" for l,p in zip(donut_labels,pcts)],
-            values=donut_vals,hole=0.52,
+            labels=[f"{l}<br>{p:.1f}%" for l,p in zip(donut_labels,pcts)],
+            values=donut_vals,hole=0.5,
             marker=dict(colors=donut_colors,line=dict(color=BG,width=2)),
-            textfont=dict(color="white",size=11),
+            textfont=dict(color="white",size=10),
             textposition="inside",textinfo="percent"))
-        fig_do.update_layout(height=310,**BL,showlegend=True)
-        fig_do.update_layout(legend=dict(bgcolor="rgba(0,0,0,0)",font=dict(color=MUTED,size=10),
-                        orientation="v",x=1.02,y=0.5))
+        fig_do.update_layout(height=340,**BL,showlegend=True)
+        fig_do.update_layout(legend=dict(bgcolor="rgba(0,0,0,0)",font=dict(color=MUTED,size=9),
+                             orientation="v",x=1.02,y=0.5))
         st.plotly_chart(fig_do,use_container_width=True)
 
-    # Évolution pertes par tranche
-    st.markdown("<div class='sh'>Évolution des Pertes par Tranche</div>",unsafe_allow_html=True)
+    # ══════════════════════════════════════════════════
+    # SECTION 5 — Détail par famille (TD/TP/TQ)
+    # ══════════════════════════════════════════════════
+    st.markdown("<div class='sh'>🔬 Analyse Détaillée par Famille de Pertes</div>",unsafe_allow_html=True)
+    fa1,fa2,fa3=st.columns(3)
+
+    def famille_card(sources_list,titre,couleur,total_fam):
+        html=f"""<div style='background:#161b22;border:1px solid {couleur}33;border-radius:12px;padding:14px 16px;border-left:4px solid {couleur}'>
+<div style='font-family:Rajdhani;font-size:1rem;font-weight:700;color:{couleur};margin-bottom:12px'>{titre}</div>"""
+        for src in sources_list:
+            val=pv.get(src,0); pct=val/total_fam*100 if total_fam>0 else 0
+            bar_c=pdef[src][2]
+            html+=f"""<div style='margin-bottom:10px'>
+<div style='display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:3px'>
+  <span style='color:#c9d1d9'>{src}</span>
+  <span style='color:#8b949e'>{val:,.0f} · <strong style='color:{bar_c}'>{pct:.1f}%</strong></span>
+</div>
+<div style='background:#1c2128;border-radius:4px;height:5px'>
+  <div style='background:{bar_c};height:5px;border-radius:4px;width:{min(pct,100):.1f}%'></div>
+</div></div>"""
+        html+="</div>"
+        return html
+
+    with fa1:
+        st.markdown(famille_card(["Pannes","Remplacement préventif"],"🔴 DISPONIBILITÉ — TD","#f85149",td_l),unsafe_allow_html=True)
+    with fa2:
+        st.markdown(famille_card(["Arrêts mineurs","Nettoyage","Réglage dérive","Inspection",
+                                   "Changement outil","Déplacement","Lubrification"],"🟡 PERFORMANCE — TP","#d29922",tp_l),unsafe_allow_html=True)
+    with fa3:
+        st.markdown(famille_card(["Rejet démarrage","Rejet qualité"],"🟢 QUALITÉ — TQ","#3fb950",tq_l),unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════
+    # SECTION 6 — Évolution pertes par tranche
+    # ══════════════════════════════════════════════════
+    st.markdown("<div class='sh'>📈 Évolution des Pertes par Tranche</div>",unsafe_allow_html=True)
     by_tp=df_p.groupby("Tranche").agg(
-        Pannes=("Panne","sum"),Arrêts_mineurs=("Arrêts_mineurs","sum"),
+        Pannes=("Panne","sum"),
+        Arrêts_mineurs=("Arrêts_mineurs","sum"),
         Rejet_qualité=("Rejet_qualité","sum"),
-        Rejet_démarrage=("Rejet_Démarrage",lambda x:x.fillna(0).sum())
+        Rejet_démarrage=("Rejet_Démarrage",lambda x:x.fillna(0).sum()),
+        Nettoyage=("Nettoyage","sum"),
+        Lubrification=("Lubrification","sum"),
+        Changement_outil=("Changement_outil","sum")
     ).reset_index().sort_values("Tranche")
     fig_ep=go.Figure()
-    for col,c,n in [("Pannes","#f85149","Pannes"),("Arrêts_mineurs","#d29922","Arrêts mineurs"),
-                     ("Rejet_qualité","#3fb950","Rejet qualité"),("Rejet_démarrage","#a371f7","Rejet démarrage")]:
+    for col,c,n in [("Pannes","#f85149","Pannes (TD)"),("Arrêts_mineurs","#d29922","Arrêts mineurs (TP)"),
+                     ("Rejet_qualité","#3fb950","Rejet qualité (TQ)"),("Rejet_démarrage","#a371f7","Rejet démarrage (TQ)"),
+                     ("Nettoyage","#e3b341","Nettoyage (TP)"),("Lubrification","#c77dff","Lubrification (TP)")]:
         fig_ep.add_trace(go.Scatter(x=by_tp["Tranche"],y=by_tp[col],name=n,
             line=dict(color=c,width=2),mode="lines+markers",marker=dict(size=6)))
-    fig_ep.update_layout(height=255,**BL,xaxis=txax(by_tp["Tranche"]),yaxis=ax(title="Total (min / pcs)"))
+    fig_ep.update_layout(height=280,**BL,xaxis=txax(by_tp["Tranche"]),yaxis=ax(title="Total (min / pcs)"))
     st.plotly_chart(fig_ep,use_container_width=True)
 
-    st.markdown("<div class='sh'>📋 Tableau par Tranche</div>",unsafe_allow_html=True)
+    # Barres empilées pertes par tranche
+    st.markdown("<div class='sh'>📊 Pertes Cumulées par Tranche — Vue Empilée</div>",unsafe_allow_html=True)
+    fig_stack=go.Figure()
+    t_lab=[f"T{int(t)}" for t in by_tp["Tranche"]]
+    for col,c,n in [("Pannes","#f85149","Pannes"),("Arrêts_mineurs","#d29922","Arrêts mineurs"),
+                     ("Rejet_qualité","#3fb950","Rejet qualité"),("Nettoyage","#e3b341","Nettoyage"),
+                     ("Lubrification","#c77dff","Lubrification"),("Changement_outil","#ffb347","Changement outil")]:
+        fig_stack.add_trace(go.Bar(name=n,x=t_lab,y=by_tp[col],marker_color=c,
+            marker_line_color="rgba(0,0,0,0)"))
+    fig_stack.update_layout(barmode="stack",height=280,**BL,xaxis=ax(title="Tranche"),yaxis=ax(title="Minutes / pièces"))
+    st.plotly_chart(fig_stack,use_container_width=True)
+
+    # ══════════════════════════════════════════════════
+    # SECTION 7 — Comparaison pertes par département
+    # ══════════════════════════════════════════════════
+    st.markdown("<div class='sh'>🏭 Comparaison des Pertes — 3 Départements vs Norme NFE</div>",unsafe_allow_html=True)
+    dept_pertes={}
+    for dept in ["Découpe","Usinage","Peinture"]:
+        sub=comb_f2[comb_f2["Département"]==dept]
+        if sub.empty: dept_pertes[dept]={"TD":0,"TP":0,"TQ":0,"Pannes":0,"Rejets":0,"TRS":0}
+        else:
+            dept_pertes[dept]={
+                "TD":sub["TD"].mean()*100,"TP":sub["TP"].mean()*100,
+                "TQ":sub["TQ"].mean()*100,"TRS":sub["TRS"].mean()*100,
+                "Pannes":sub["Panne"].fillna(0).sum(),
+                "Rejets":sub["Rejet_qualité"].fillna(0).sum()
+            }
+
+    fig_dept_p=make_subplots(rows=1,cols=2,subplot_titles=["TRS / TD / TQ / TP par Département vs NFE","Volume de Pertes par Département"])
+    kpis_cmp=["TRS","TD","TQ","TP"]
+    for dept,dc in DEPT_COLORS.items():
+        vals=[dept_pertes[dept][k] for k in kpis_cmp]
+        fig_dept_p.add_trace(go.Bar(name=dept,x=kpis_cmp,y=vals,marker_color=dc,
+            text=[f"{v:.1f}%" for v in vals],textposition="outside",textfont=dict(color=TEXT,size=8),
+            showlegend=True),row=1,col=1)
+    # Norme NFE
+    fig_dept_p.add_trace(go.Bar(name="Norme NFE",x=kpis_cmp,y=[THRESHOLDS[k] for k in kpis_cmp],
+        marker_color="rgba(110,118,129,0.3)",marker_line_color="rgba(110,118,129,0.5)",
+        text=[f"{THRESHOLDS[k]}%" for k in kpis_cmp],textposition="outside",textfont=dict(color=MUTED,size=8)),row=1,col=1)
+    # Volume pertes
+    dept_names=["Découpe","Usinage","Peinture"]
+    fig_dept_p.add_trace(go.Bar(name="Pannes (min)",x=dept_names,
+        y=[dept_pertes[d]["Pannes"] for d in dept_names],marker_color="#f85149",showlegend=False,
+        text=[f"{int(dept_pertes[d]['Pannes'])}" for d in dept_names],
+        textposition="outside",textfont=dict(color=TEXT,size=9)),row=1,col=2)
+    fig_dept_p.add_trace(go.Bar(name="Rejets (pcs)",x=dept_names,
+        y=[dept_pertes[d]["Rejets"] for d in dept_names],marker_color="#3fb950",showlegend=False,
+        text=[f"{int(dept_pertes[d]['Rejets'])}" for d in dept_names],
+        textposition="outside",textfont=dict(color=TEXT,size=9)),row=1,col=2)
+    fig_dept_p.update_layout(height=340,**BL,barmode="group")
+    fig_dept_p.update_yaxes(ticksuffix="%",gridcolor="#1e2430",tickfont=dict(color=MUTED,size=9),row=1,col=1)
+    fig_dept_p.update_yaxes(gridcolor="#1e2430",tickfont=dict(color=MUTED,size=9),row=1,col=2)
+    fig_dept_p.update_xaxes(gridcolor="#1e2430",tickfont=dict(color=MUTED,size=9))
+    st.plotly_chart(fig_dept_p,use_container_width=True)
+
+    # ══════════════════════════════════════════════════
+    # SECTION 8 — Tableau récap
+    # ══════════════════════════════════════════════════
+    st.markdown("<div class='sh'>📋 Tableau Récapitulatif par Tranche</div>",unsafe_allow_html=True)
     tbl_r=[]
     for t in sorted(df_p["Tranche"].unique()):
         s=df_p[df_p["Tranche"]==t]
+        pannes=int(s["Panne"].sum()); arrets=int(s["Arrêts_mineurs"].sum())
+        rq=int(s["Rejet_qualité"].sum()); rd=int(s["Rejet_Démarrage"].fillna(0).sum())
+        nett=int(s["Nettoyage"].sum()); lubr=int(s["Lubrification"].sum())
         tbl_r.append({"Tranche":f"T{int(t)}","Jours":f"{(int(t)-1)*25+1}–{int(t)*25}",
                       "TRS %":round(s["TRS"].mean()*100,2),"TD %":round(s["TD"].mean()*100,2),
                       "TQ %":round(s["TQ"].mean()*100,2),"TP %":round(s["TP"].mean()*100,2),
-                      "Pannes min":int(s["Panne"].sum()),"Rejet qualité":int(s["Rejet_qualité"].sum())})
+                      "Pannes (min)":pannes,"Arrêts mineurs":arrets,
+                      "Rejet qualité":rq,"Rejet démarrage":rd,
+                      "Nettoyage":nett,"Lubrification":lubr})
     st.dataframe(pd.DataFrame(tbl_r),use_container_width=True,hide_index=True,column_config=pbar_cfg())
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -757,8 +1155,7 @@ elif page=="final":
             marker_color=dc,marker_line_color="rgba(0,0,0,0)",
             text=[f"{tgt[k]:.1f}%" for k in kpis],textposition="outside",textfont=dict(color=TEXT,size=10)))
         fig_ab.add_trace(go.Scatter(x=kpis,y=[act[k] for k in kpis],mode="lines",
-            line=dict(color="#f85149",width=1.5,dash="dash"),showlegend=False,
-            hoverinfo="skip"))
+            line=dict(color="#f85149",width=1.5,dash="dash"),showlegend=False,hoverinfo="skip"))
         fig_ab.update_layout(barmode="group",height=300,**BL,
             title=dict(text=f"Gains obtenus après 10 mois d'amélioration — {dept}",font=dict(color=MUTED,size=11)),
             xaxis=ax(),yaxis=ax(pct=True))
