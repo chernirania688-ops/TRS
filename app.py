@@ -721,73 +721,38 @@ elif page=="final":
     st.plotly_chart(fig_rm,use_container_width=True)
 
     # ═══ 2. GAINS OBTENUS ═══════════════════════════════════════════════════
-st.markdown("---")
-st.markdown("<h3 style='font-family:Rajdhani;font-size:1.5rem;color:#3fb950;letter-spacing:1px;margin-bottom:16px'> Gains obtenus après application du plan d'action — par Département</h3>", unsafe_allow_html=True)
-
-# Note : Assure-toi que DEPT_COLORS, actuals et TARGETS sont bien définis avant cette boucle
-for dept, dc in DEPT_COLORS.items():
-    act = actuals[dept]
-    tgt = TARGETS[dept]
-    kpis = ["TD", "TP", "TQ", "TRS"]
-    
-    ann_cols = st.columns(4)
-    
-    for i, kpi in enumerate(kpis):
-        # On multiplie par 100 si tes données sont en format 0.xx
-        a = act[kpi] * 100 if act[kpi] <= 1 else act[kpi]
-        t = tgt[kpi] * 100 if tgt[kpi] <= 1 else tgt[kpi]
-        delta = t - a
-        
-        with ann_cols[i]:
-            # Utilisation de f-string propre avec des doubles guillemets pour le style CSS
-            html_code = f"""
-            <div style="text-align:center; padding:6px 0; background-color:#111827; border-radius:10px; margin:2px;">
-                <div style="color:#8b949e; font-size:0.85rem; font-weight:500;">{a:.1f}%</div>
-                <div style="color:{dc}; font-size:0.95rem; font-weight:700;">↑ +{delta:.1f} pts</div>
-                <div style="color:#3fb950; font-family:Rajdhani; font-size:1.3rem; font-weight:700;">{t:.1f}%</div>
-                <div style="color:#8b949e; font-size:0.72rem; text-transform:uppercase; letter-spacing:1px;">{kpi}</div>
-            </div>
-            """
-            st.markdown(html_code, unsafe_allow_html=True)
-    
-    # --- GRAPHIQUE DE COMPARAISON (PARETO / GAINS) ---
-    fig_ab = go.Figure()
-    
-    # Valeurs pour le graphique (en %)
-    y_act = [act[k]*100 if act[k] <= 1 else act[k] for k in kpis]
-    y_tgt = [tgt[k]*100 if tgt[k] <= 1 else tgt[k] for k in kpis]
-
-    fig_ab.add_trace(go.Bar(
-        name="Actuel", x=kpis, y=y_act,
-        marker_color="#4a5568",
-        text=[f"{v:.1f}%" for v in y_act],
-        textposition="outside",
-        textfont=dict(color="#FFFFFF", size=10)
-    ))
-    
-    fig_ab.add_trace(go.Bar(
-        name="Objectif (Après plan)", x=kpis, y=y_tgt,
-        marker_color=dc,
-        text=[f"{v:.1f}%" for v in y_tgt],
-        textposition="outside",
-        textfont=dict(color="#FFFFFF", size=10)
-    ))
-
-    fig_ab.update_layout(
-        barmode="group",
-        height=350,
-        template="plotly_dark",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        title=dict(text=f"Projection des gains d'amélioration — {dept}", font=dict(color="#94A3B8", size=14)),
-        yaxis=dict(range=[0, 115], ticksuffix="%"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    
-    st.plotly_chart(fig_ab, use_container_width=True)
-    st.markdown("<hr style='border-color:#1e2430; margin:16px 0'>", unsafe_allow_html=True)
-           
-
+ st.markdown("---")
+    st.markdown("<h3 style='font-family:Rajdhani;font-size:1.5rem;color:#3fb950;letter-spacing:1px;margin-bottom:16px'>📊 Gains obtenus après application du plan d'action — par Département</h3>",unsafe_allow_html=True)
+ 
+    for dept,dc in DEPT_COLORS.items():
+        act=actuals[dept]; tgt=TARGETS[dept]; kpis=["TD","TP","TQ","TRS"]
+        ann_cols=st.columns(4)
+        for kpi in kpis:
+            a=act[kpi]; t=tgt[kpi]; delta=t-a
+            with ann_cols[kpis.index(kpi)]:
+                st.markdown(f"""<div style='text-align:center;padding:6px 0'>
+<div style='color:#8b949e;font-size:0.85rem;font-weight:500'>{a:.1f}%</div>>
+<div style='color:{dc};font-size:0.95rem;font-weight:700'>↑ +{delta:.1f} pts</div>>
+<div style='color:#3fb950;font-family:Rajdhani;font-size:1.3rem;font-weight:700'>{t:.1f}%</div>>
+<div style='color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px'>{kpi}</div>>
+</div>""",unsafe_allow_html=True)
+        fig_ab=go.Figure()
+        fig_ab.add_trace(go.Bar(name="Actuel",x=kpis,y=[act[k] for k in kpis],
+            marker_color="#4a5568",marker_line_color="rgba(0,0,0,0)",
+            text=[f"{act[k]:.1f}%" for k in kpis],textposition="outside",textfont=dict(color=TEXT,size=10)))
+        fig_ab.add_trace(go.Bar(name="Objectif",x=kpis,y=[tgt[k] for k in kpis],
+            marker_color=dc,marker_line_color="rgba(0,0,0,0)",
+            text=[f"{tgt[k]:.1f}%" for k in kpis],textposition="outside",textfont=dict(color=TEXT,size=10)))
+        fig_ab.add_trace(go.Scatter(x=kpis,y=[act[k] for k in kpis],mode="lines",
+            line=dict(color="#f85149",width=1.5,dash="dash"),showlegend=False,
+            hoverinfo="skip"))
+        fig_ab.update_layout(barmode="group",height=300,**BL,
+            title=dict(text=f"Gains obtenus après 10 mois d'amélioration — {dept}",font=dict(color=MUTED,size=11)),
+            xaxis=ax(),yaxis=ax(pct=True))
+        fig_ab.update_layout(legend=dict(bgcolor="rgba(0,0,0,0)",font=dict(color=MUTED,size=11)))
+        fig_ab.update_yaxes(range=[0,115])
+        st.plotly_chart(fig_ab,use_container_width=True)
+        st.markdown("<hr style='border-color:#1e2430;margin:8px 0'>",unsafe_allow_html=True)
     # Production supplémentaire
     st.markdown("<div class='sh'>Production Supplémentaire Estimée</div>",unsafe_allow_html=True)
     ep1,ep2,ep3,ep4=st.columns(4)
