@@ -200,10 +200,10 @@ def kpi_row(trs_m,td_m,tq_m,tp_m):
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("# 🏭 TRS")
+    st.markdown("# Approche TPM")
     st.markdown("<p style='color:#484f58;font-size:0.68rem;letter-spacing:2px;margin-top:-4px'>MEUBLES INC.</p>",unsafe_allow_html=True)
     st.markdown("---")
-    PAGES={"📊  Dashboard Global":"global","🪚  Dép. Découpe":"decoupe","⚙️  Dép. Usinage":"usinage","🎨  Dép. Peinture":"peinture","🔍  Source des Pertes":"pertes","🏆  Dashboard Final":"final"}
+    PAGES={" Dashboard Global":"global","  Dép. Découpe":"decoupe"," Dép. Usinage":"usinage","  Dép. Peinture":"peinture"," Source des Pertes":"pertes","  Dashboard Final":"final"}
     if "page" not in st.session_state: st.session_state.page="global"
     for label,key in PAGES.items():
         if st.session_state.page==key:
@@ -221,12 +221,12 @@ page=st.session_state.page
 # GLOBAL
 # ══════════════════════════════════════════════════════════════════════════════
 if page=="global":
-    page_header("📊","DASHBOARD GLOBAL","Vue d'ensemble — 10 tranches × 25 jours · 3 départements · 4 produits")
-    sel_tab=tab_bar(["📅 Journalier","📆 Par Tranche"],"tab_global")
+    page_header("DASHBOARD GLOBAL","Vue d'ensemble — 10 tranches × 25 jours · 3 départements · 4 produits")
+    sel_tab=tab_bar([" Journalier"," Par Tranche"],"tab_global")
     fc1,fc2=st.columns(2)
     with fc1: sel_prod=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key="g_prod")
     with fc2: sel_dept=st.selectbox("Département",["Tous"]+list(DEPT_COLORS.keys()),key="g_dept")
-    if sel_tab=="📆 Par Tranche":
+    if sel_tab==" Par Tranche":
         sel_t=tranche_toggle("g")
         if not sel_t: st.warning("Sélectionnez au moins une tranche."); st.stop()
     else:
@@ -239,7 +239,7 @@ if page=="global":
     trs_m=df["TRS"].mean()*100; td_m=df["TD"].mean()*100; tq_m=df["TQ"].mean()*100; tp_m=df["TP"].mean()*100
     st.markdown("---")
     kpi_row(trs_m,td_m,tq_m,tp_m)
-    if sel_tab=="📆 Par Tranche":
+    if sel_tab==" Par Tranche":
         by_t=df.groupby("Tranche")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Tranche")
         st.markdown("<div class='sh'>Évolution TRS · TD · TQ · TP par Tranche</div>",unsafe_allow_html=True)
         fig_ev=go.Figure()
@@ -303,11 +303,11 @@ if page=="global":
 # DEPT PAGE
 # ══════════════════════════════════════════════════════════════════════════════
 def dept_page(dept_name):
-    dc=DEPT_COLORS[dept_name]; icons={"Découpe":"🪚","Usinage":"⚙️","Peinture":"🎨"}
+    dc=DEPT_COLORS[dept_name]; icons={"Découpe","Usinage","Peinture"}
     page_header(icons[dept_name],f"DÉPARTEMENT {dept_name.upper()}","Filtrage interactif — seuils TPM")
 
     # ── 1. TAB BAR (top) ──
-    sel_tab=tab_bar(["📊 Visualisation","🔍 Analyse Détaillée","💡 Solutions & Gains"],f"tab_dept_{dept_name}")
+    sel_tab=tab_bar([" Visualisation"," Analyse Détaillée"," Solutions & Gains"],f"tab_dept_{dept_name}")
 
     # ── 2. COMMON FILTER: Produit only ──
     sel_prod=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key=f"p_{dept_name}")
@@ -329,22 +329,22 @@ def dept_page(dept_name):
     # ══════════════════════════════════════════════════════════════════════════
     # TAB: VISUALISATION
     # ══════════════════════════════════════════════════════════════════════════
-    if sel_tab=="📊 Visualisation":
+    if sel_tab==" Visualisation":
         # Sub toggle Journalier / Par Tranche BELOW kpi row
         sub_key=f"visu_sub_{dept_name}"
-        if sub_key not in st.session_state: st.session_state[sub_key]="📅 Journalier"
+        if sub_key not in st.session_state: st.session_state[sub_key]=" Journalier"
         sv1,sv2,_=st.columns([1.4,1.4,8])
         with sv1:
-            if st.button("📅 Journalier",key=f"vj_{dept_name}",use_container_width=True,type="primary" if st.session_state[sub_key]=="📅 Journalier" else "secondary"):
-                st.session_state[sub_key]="📅 Journalier"; st.rerun()
+            if st.button(" Journalier",key=f"vj_{dept_name}",use_container_width=True,type="primary" if st.session_state[sub_key]==" Journalier" else "secondary"):
+                st.session_state[sub_key]=" Journalier"; st.rerun()
         with sv2:
-            if st.button("📆 Par Tranche",key=f"vt_{dept_name}",use_container_width=True,type="primary" if st.session_state[sub_key]=="📆 Par Tranche" else "secondary"):
-                st.session_state[sub_key]="📆 Par Tranche"; st.rerun()
+            if st.button(" Par Tranche",key=f"vt_{dept_name}",use_container_width=True,type="primary" if st.session_state[sub_key]==" Par Tranche" else "secondary"):
+                st.session_state[sub_key]=" Par Tranche"; st.rerun()
         vm=st.session_state[sub_key]
         st.markdown("<br>",unsafe_allow_html=True)
 
         # Tranche filter ONLY inside Par Tranche
-        if vm=="📆 Par Tranche":
+        if vm==" Par Tranche":
             sel_t=tranche_toggle(f"vis_{dept_name}")
             if not sel_t: st.warning("Sélectionnez au moins une tranche."); return
             df_v=dfs[dept_name][dfs[dept_name]["Tranche"].isin(sel_t)].copy()
@@ -361,7 +361,7 @@ def dept_page(dept_name):
         with cg3: st.plotly_chart(gauge(tq_v,"TQ","#3fb950",98),use_container_width=True,key=f"g3_{dept_name}")
         with cg4: st.plotly_chart(gauge(tp_v,"TP","#d29922",95),use_container_width=True,key=f"g4_{dept_name}")
 
-        if vm=="📆 Par Tranche":
+        if vm==" Par Tranche":
             by_t=df_v.groupby("Tranche")[["TRS","TD","TQ","TP"]].mean().reset_index().sort_values("Tranche")
             xvals=by_t["Tranche"]; xlabels=[f"T{int(v)}" for v in xvals]; xax_cfg=txax(xvals)
             st.markdown("<div class='sh'>Évolution TRS · TD · TQ · TP par Tranche</div>",unsafe_allow_html=True)
@@ -415,7 +415,7 @@ def dept_page(dept_name):
     # ══════════════════════════════════════════════════════════════════════════
     # TAB: ANALYSE DÉTAILLÉE
     # ══════════════════════════════════════════════════════════════════════════
-    elif sel_tab=="🔍 Analyse Détaillée":
+    elif sel_tab==" Analyse Détaillée":
         df=df_all
         pv={l:df[c].fillna(0).sum() for l,(c,_,_) in PDEF.items()}
         td_l=pv["Pannes"]+pv["Remplacement préventif"]
@@ -442,8 +442,8 @@ def dept_page(dept_name):
         st.markdown("""<div style='background:#1a1010;border:1px solid #f85149;border-radius:8px;padding:14px 18px;margin:8px 0 12px'>
 <p style='color:#f85149;font-family:Rajdhani;font-size:1.1rem;font-weight:700;margin:0 0 6px'>🔴 PERTES DE DISPONIBILITÉ — réduisent TD</p>
 <div style='background:#0d1f2d;border:1px solid #1f6feb;border-radius:8px;padding:10px 14px;margin:0 0 10px'>
-<code style='color:#58a6ff;font-size:0.9rem'>TD = TR / TO</code>
-<span style='color:#8b949e;font-size:0.76rem'>&nbsp;&nbsp;où TR = TO − Pannes − Remplacement préventif</span></div>
+<code style='color:#58a6ff;font-size:0.9rem'>TD = TFB / TR</code>
+<span style='color:#8b949e;font-size:0.76rem'>&nbsp;&nbsp;où TR = TO − arrêts planifiés </span></div>
 <p style='color:#c9d1d9;font-size:0.78rem;margin:0 0 10px'>Tout événement qui immobilise la machine sans produire détériore TD.</p>
 <table class='cause-table'><tr><th>Source</th><th>Colonne</th><th>Impact</th></tr>
 <tr><td><strong style='color:#f85149'>Pannes</strong></td><td><code style='background:#1c2128;padding:1px 5px;border-radius:3px;color:#f0883e'>Panne</code></td><td>Arrêt non planifié — cause principale de dégradation du TD dans les 3 départements</td></tr>
@@ -561,7 +561,7 @@ def dept_page(dept_name):
     # ══════════════════════════════════════════════════════════════════════════
     # TAB: SOLUTIONS & GAINS
     # ══════════════════════════════════════════════════════════════════════════
-    elif sel_tab=="💡 Solutions & Gains":
+    elif sel_tab==" Solutions & Gains":
         sol=SOLUTIONS[dept_name]; tgt=TARGETS[dept_name]
         act={"TD":td_m,"TP":tp_m,"TQ":tq_m,"TRS":trs_m}
         trs_act=sol["trs_act"]; trs_obj=sol["trs_obj"]
@@ -611,7 +611,7 @@ elif page=="peinture":dept_page("Peinture")
 # SOURCE DES PERTES
 # ══════════════════════════════════════════════════════════════════════════════
 elif page=="pertes":
-    page_header("🔍","SOURCE DES PERTES","Analyse comparative — 3 départements · 11 sources · Pareto · Anneau TPM")
+    page_header("SOURCE DES PERTES","Analyse comparative — 3 départements · 11 sources · Pareto · Anneau TPM")
     sel_prod_p=st.selectbox("Produit",["Tous","P1","P2","P3","P4"],key="p_pertes_g")
     sel_t_p=tranche_toggle("p_pertes")
     combined=pd.concat(dfs.values(),ignore_index=True)
@@ -676,8 +676,8 @@ elif page=="pertes":
 # DASHBOARD FINAL
 # ══════════════════════════════════════════════════════════════════════════════
 elif page=="final":
-    page_header("🏆","DASHBOARD FINAL","Plan d'Action Global · Gains · Production supplémentaire")
-    sel_tab=tab_bar(["🛠️ Plan d'Action","📈 Gains & Production"],"tab_final")
+    page_header("DASHBOARD FINAL","Plan d'Action Global · Gains · Production supplémentaire")
+    sel_tab=tab_bar([" Plan d'Action","Gains & Production"],"tab_final")
     actuals={}
     for dept in ["Découpe","Usinage","Peinture"]:
         d=dfs[dept]; actuals[dept]={"TD":d["TD"].mean()*100,"TP":d["TP"].mean()*100,"TQ":d["TQ"].mean()*100,"TRS":d["TRS"].mean()*100}
@@ -702,7 +702,7 @@ elif page=="final":
         st.markdown("<hr style='border-color:#21262d;margin:20px 0'>",unsafe_allow_html=True)
         st.markdown(f"""<h3 style='font-family:Rajdhani;font-size:1.5rem;font-weight:700;color:#3fb950;margin:0'>Résultat attendu : TRS {trs_act_lbl} → {trs_obj_lbl} après 10 mois</h3>""",unsafe_allow_html=True)
         st.markdown("<br>",unsafe_allow_html=True)
-        st.markdown("<div class='sh'>📅 Roadmap — Horizon 10 Tranches</div>",unsafe_allow_html=True)
+        st.markdown("<div class='sh'> Roadmap — Horizon 10 Tranches</div>",unsafe_allow_html=True)
         rm={"Action":["Maintenance Préventive","SMED Outils","5S Nettoyage","Poka-Yoke Démarrage","AMDEC Processus","SPC/Capabilité","Maintenance Autonome","Optimisation flux"],"Famille":["TD","TP","TP","TQ","TQ","TQ","TD","TP"],"Début":[1,1,2,1,2,3,3,4],"Fin":[4,3,10,4,5,10,10,10],"Impact":["+5%","+4%","+2%","+3%","+2%","+2%","+3%","+2%"]}
         rdf2=pd.DataFrame(rm); fam_c={"TD":"#f85149","TP":"#d29922","TQ":"#3fb950"}
         fig_rm=go.Figure(); shown=set()
@@ -712,10 +712,10 @@ elif page=="final":
         fig_rm.update_layout(height=270,**bl(),barmode="overlay",xaxis=dict(**ax(),tickmode="array",tickvals=list(range(1,11)),ticktext=[f"T{i}" for i in range(1,11)]),yaxis=ax())
         st.plotly_chart(fig_rm,use_container_width=True)
 
-    elif sel_tab=="📈 Gains & Production":
-        sel_dept_g=st.selectbox("🏭 Département",["Tous"]+list(DEPT_COLORS.keys()),key="final_dept_gains")
+    elif sel_tab==" Gains & Production":
+        sel_dept_g=st.selectbox(" Département",["Tous"]+list(DEPT_COLORS.keys()),key="final_dept_gains")
         depts_show=["Découpe","Usinage","Peinture"] if sel_dept_g=="Tous" else [sel_dept_g]
-        icons={"Découpe":"🪚","Usinage":"⚙️","Peinture":"🎨"}
+        icons={"Découpe","Usinage","Peinture"}
         for dept in depts_show:
             dco=DEPT_COLORS[dept]; act=actuals[dept]; tgt=TARGETS[dept]; kpis=["TD","TP","TQ","TRS"]
             st.markdown(f"<div class='sh' style='color:{dco}'>{icons[dept]} {dept}</div>",unsafe_allow_html=True)
@@ -760,7 +760,7 @@ elif page=="final":
 <div style='color:#8b949e;font-size:0.7rem'>soit +{total_u*250:,} / an</div></div>""",unsafe_allow_html=True)
         st.markdown("<br>",unsafe_allow_html=True)
         st.markdown("""<div style='background:linear-gradient(135deg,#161b22,#1c2128);border:1px solid #1f6feb;border-radius:10px;padding:14px 20px'>
-<p style='color:#58a6ff;font-weight:700;margin:0 0 6px;font-family:Rajdhani;font-size:1rem'>💡 Synthèse Globale des Gains</p>
+<p style='color:#58a6ff;font-weight:700;margin:0 0 6px;font-family:Rajdhani;font-size:1rem'> Synthèse Globale des Gains</p>
 <p style='color:#8b949e;font-size:0.78rem;margin:0;line-height:1.8'>
 Actions priorité 1 et 2 → gain cumulé estimé <span style='color:#3fb950;font-weight:700'>+15% à +45%</span>.
 <strong style='color:#58a6ff'>Découpe</strong> : maintenance préventive (TD = 63.9%).
