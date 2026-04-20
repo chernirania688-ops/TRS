@@ -304,7 +304,7 @@ if page=="global":
 # ══════════════════════════════════════════════════════════════════════════════
 def dept_page(dept_name):
     dc=DEPT_COLORS[dept_name]; icons={"Découpe","Usinage","Peinture"}
-    page_header(icons[dept_name],f"DÉPARTEMENT {dept_name.upper()}","Filtrage interactif — seuils TPM")
+    page_header([dept_name],f"DÉPARTEMENT {dept_name.upper()}","Filtrage interactif — seuils TPM")
 
     # ── 1. TAB BAR (top) ──
     sel_tab=tab_bar([" Visualisation"," Analyse Détaillée"," Solutions & Gains"],f"tab_dept_{dept_name}")
