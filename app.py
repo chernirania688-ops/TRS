@@ -159,11 +159,11 @@ def tranche_toggle(key_prefix):
         if f"{key_prefix}_{i}" not in st.session_state: st.session_state[f"{key_prefix}_{i}"]=True
     rc1,rc2,_=st.columns([1.2,1.2,9])
     with rc1:
-        if st.button("✅ Tout",key=f"all_{key_prefix}",use_container_width=True):
+        if st.button(" Tout",key=f"all_{key_prefix}",use_container_width=True):
             for i in range(1,11): st.session_state[f"{key_prefix}_{i}"]=True
             st.rerun()
     with rc2:
-        if st.button("❌ Aucun",key=f"none_{key_prefix}",use_container_width=True):
+        if st.button(" Aucun",key=f"none_{key_prefix}",use_container_width=True):
             for i in range(1,11): st.session_state[f"{key_prefix}_{i}"]=False
             st.rerun()
     cols=st.columns(10)
@@ -185,9 +185,9 @@ def tab_bar(tabs, state_key):
                 st.session_state[state_key]=tab; st.rerun()
     return st.session_state[state_key]
 
-def page_header(icon,title,subtitle):
+def page_header(title,subtitle):
     st.markdown(f"""<div style='margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #21262d'>
-<h1 style='font-family:Rajdhani;font-size:2rem;color:#e6edf3;letter-spacing:2px;margin:0;font-weight:700'>{icon} {title}</h1>
+<h1 style='font-family:Rajdhani;font-size:2rem;color:#e6edf3;letter-spacing:2px;margin:0;font-weight:700'> {title}</h1>
 <p style='color:#8b949e;font-size:0.78rem;margin:4px 0 0'>{subtitle}</p></div>""",unsafe_allow_html=True)
 
 def kpi_row(trs_m,td_m,tq_m,tp_m):
