@@ -303,7 +303,7 @@ if page=="global":
 # DEPT PAGE
 # ══════════════════════════════════════════════════════════════════════════════
 def dept_page(dept_name):
-    dc=DEPT_COLORS[dept_name]; icons={"Découpe","Usinage","Peinture"}
+    dc=DEPT_COLORS[dept_name]; 
     page_header([dept_name],f"DÉPARTEMENT {dept_name.upper()}","Filtrage interactif — seuils TPM")
 
     # ── 1. TAB BAR (top) ──
